@@ -1,0 +1,140 @@
+/* =========================================
+   ETAPA 1: VARIABLES Y RESETEO (Apple Pro Style)
+   ========================================= */
+:root {
+    --apple-bg: #f5f5f7;
+    --apple-card: #ffffff;
+    --apple-text: #1d1d1f;
+    --apple-muted: #86868b;
+    --apple-blue: #0071e3;
+    --apple-border: rgba(0,0,0,0.08);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; }
+body { background-color: var(--apple-bg); color: var(--apple-text); }
+.hidden { display: none !important; }
+.screen { width: 100%; min-height: 100vh; }
+.active { display: flex; justify-content: center; align-items: center; }
+
+/* =========================================
+   ETAPA 2: INTRO POKÉMON (Login Retro)
+   ========================================= */
+.retro-bg { background-color: #2b2b2b; position: relative; overflow: hidden; font-family: 'Press Start 2P', cursive; }
+#rain-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.falling-ball { position: absolute; top: -100px; background-size: cover; background-position: center; opacity: 0.6; animation: fall linear infinite; }
+@keyframes fall { 0% { transform: translateY(-100px) rotate(0deg); } 100% { transform: translateY(110vh) rotate(360deg); } }
+
+.glass-pokedex { position: relative; z-index: 10; background-color: #dc0a2d; border: 5px solid #000; border-radius: 20px; padding: 20px; width: 90%; max-width: 450px; box-shadow: inset -5px -5px 0px rgba(0,0,0,0.2), 15px 15px 30px rgba(0,0,0,0.5); }
+.screen-header { display: flex; margin-bottom: 20px; border-bottom: 4px solid #8b0015; padding-bottom: 10px; }
+.blue-light { width: 50px; height: 50px; background: radial-gradient(#6bf, #237); border-radius: 50%; border: 4px solid #fff; box-shadow: 0 0 10px #6bf, 0 0 0 4px #000; }
+.small-lights { display: flex; gap: 8px; margin-left: 20px; margin-top: 5px; }
+.small-lights div { width: 15px; height: 15px; border-radius: 50%; border: 2px solid #000; }
+.red-light { background-color: #f00; } .yellow-light { background-color: #fe0; } .green-light { background-color: #0f0; }
+
+.pokedex-screen { background-color: #dedede; border: 4px solid #000; border-radius: 10px 10px 10px 40px; padding: 20px; text-align: center; }
+.title-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; }
+.typewriter-title { font-size: 16px; font-family: 'Press Start 2P'; }
+.typewriter-subtitle { font-size: 10px; color: #555; margin-top: 5px; font-family: 'Press Start 2P'; }
+.input-group input { width: 100%; padding: 12px; background-color: #9bbc0f; border: 3px solid #0f380f; color: #0f380f; font-family: 'Press Start 2P'; font-size: 10px; outline: none; text-align: center; border-radius: 5px; }
+.poke-btn { background-color: #ffde00; color: #3b4cca; border: 4px solid #3b4cca; padding: 12px; width: 100%; font-size: 12px; font-family: 'Press Start 2P'; font-weight: bold; cursor: pointer; margin-top: 10px; border-radius: 8px; box-shadow: 4px 4px 0px #3b4cca; }
+.poke-btn:active { transform: translate(4px, 4px); box-shadow: 0px 0px 0px #3b4cca; }
+.captcha-box { background-color: #fff; border: 3px solid #000; border-radius: 8px; padding: 10px; margin-bottom: 15px; }
+.captcha-title { font-size: 8px; margin-bottom: 10px; font-family: 'Press Start 2P'; }
+.hint-text { font-size: 8px; color: #cc0000; margin: 10px 0; font-family: 'Press Start 2P'; }
+.silhouette { width: 100px; height: 100px; filter: brightness(0); transition: 0.5s; }
+.revealed { filter: none !important; }
+.btn-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.btn-captcha { background-color: #3b4cca; color: white; border: 2px solid #000; padding: 8px; font-size: 8px; font-family: 'Press Start 2P'; cursor: pointer; border-radius: 4px; }
+
+/* =========================================
+   ETAPA 3: DASHBOARD CORPORATIVO (Apple Pro Style)
+   ========================================= */
+.modern-bg { background-color: var(--apple-bg); }
+
+/* Navbar Transparente (Efecto Cristal) */
+.solid-navbar { background: rgba(255, 255, 255, 0.75); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); padding: 12px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--apple-border); position: sticky; top: 0; z-index: 100; }
+.nav-brand { display: flex; align-items: center; gap: 15px; }
+.nav-title { color: var(--apple-text); font-weight: 600; font-size: 14px; letter-spacing: -0.2px; }
+
+.btn-corp-outline { background: transparent; border: 1px solid var(--apple-text); color: var(--apple-text); padding: 6px 14px; border-radius: 18px; cursor: pointer; font-weight: 500; font-size: 12px; transition: 0.2s; }
+.btn-corp-outline:hover { background: var(--apple-text); color: white; }
+
+.dashboard-container { max-width: 1400px; margin: 30px auto; padding: 0 20px; }
+
+/* Tarjetas Minimalistas (Sin bordes duros) */
+.glass-card { background: var(--apple-card); border-radius: 16px; padding: 25px; margin-bottom: 25px; box-shadow: 0 4px 14px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.04); }
+.glass-card h3 { color: var(--apple-text); font-size: 15px; margin-bottom: 5px; font-weight: 600; }
+
+/* Pestañas Estilo Segmented Control de iOS */
+.tabs-container { display: flex; gap: 8px; margin-bottom: 25px; background: #e3e3e8; padding: 4px; border-radius: 10px; width: fit-content; }
+.tab-btn { background: transparent; color: var(--apple-muted); border: none; padding: 8px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.2s; }
+.tab-btn:hover { color: var(--apple-text); }
+.tab-btn.active { background: white; color: var(--apple-text); box-shadow: 0 2px 5px rgba(0,0,0,0.06); }
+
+/* Inputs y Botones Premium */
+.file-upload-wrapper { display: flex; flex-direction: column; gap: 8px; }
+.table-input, input[type="file"], .table-select { background: #f5f5f7; border: 1px solid transparent; padding: 12px; border-radius: 10px; font-size: 13px; color: var(--apple-text); outline: none; transition: 0.2s; }
+.table-input:focus, .table-select:focus { border: 1px solid var(--apple-blue); background: white; box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1); }
+
+.btn-corp-primary { background-color: var(--apple-blue); color: white; border: none; padding: 12px 20px; border-radius: 10px; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; }
+.btn-corp-primary:hover { background-color: #0077ed; }
+.btn-corp-danger { background-color: #e3342f; color: white; border: none; padding: 12px 20px; border-radius: 10px; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; }
+.btn-corp-danger:hover { background-color: #cc2a26; }
+
+/* =========================================
+   ETAPA 4: TABLAS Y ETIQUETAS ELEGANTES
+   ========================================= */
+.stat-card { background: white; border-radius: 12px; padding: 18px; border: 1px solid var(--apple-border); display: flex; flex-direction: column; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+.stat-card strong { font-size: 11px; color: var(--apple-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-card span { font-size: 26px; font-weight: 700; color: var(--apple-text); }
+
+.table-header { display: flex; justify-content: space-between; align-items: flex-start; flex-direction: column; margin-bottom: 20px; padding: 15px 20px; background: rgba(245, 245, 247, 0.5); border-radius: 12px; gap: 15px; }
+
+/* Filtros Tipo Píldora (Apple Badges) */
+.badge-apple { background: transparent; color: var(--apple-muted); padding: 6px 14px; border-radius: 16px; font-size: 12px; font-weight: 600; border: 1px solid transparent; cursor: pointer; transition: 0.2s; }
+.badge-apple:hover { color: var(--apple-text); background: #f0f0f5; }
+.badge-apple.active { background: var(--apple-text); color: white; }
+
+.table-responsive { width: 100%; overflow-x: auto; padding-bottom: 10px; }
+.corp-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.corp-table th { background: transparent; color: var(--apple-muted); font-weight: 600; padding: 12px 15px; border-bottom: 1px solid var(--apple-border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.corp-table td { padding: 16px 15px; border-bottom: 1px solid var(--apple-border); vertical-align: middle; color: var(--apple-text); font-weight: 500; }
+.corp-table tr:hover { background-color: #fafafc; }
+
+/* Status Minimalistas (Puntitos de color) */
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.st-proactivo { background: #5e5ce6; } 
+.st-reactivo { background: #ff9f0a; } 
+.st-agendado { background: #32ade6; } 
+.st-efectivo { background: #34c759; } 
+.st-perdido { background: #ff3b30; } 
+
+/* Botones de acción limpios (CORREGIDO) */
+.btn-action-clean { background: transparent; color: var(--apple-blue); border: none; font-weight: 600; font-size: 12px; cursor: pointer; transition: 0.2s; padding: 6px 12px; display: inline-block; white-space: nowrap; border-radius: 6px; }
+.btn-action-clean:hover { background: rgba(0, 113, 227, 0.1); text-decoration: none; }
+
+/* =========================================
+   ETAPA 5: MODALES 
+   ========================================= */
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+/* Ajuste de scroll para que no se esconda nada en monitores pequeños */
+.glass-modal-content { background: var(--apple-card); padding: 30px; border-radius: 16px; width: 90%; max-width: 600px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.2); max-height: 90vh; overflow-y: auto; }
+
+.purge-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--apple-border); }
+.purge-checkbox { width: 16px; height: 16px; cursor: pointer; margin-top: 2px; }
+
+/* =========================================
+   ETAPA 6: TIMELINE (MÁQUINA DE ESTADOS)
+   ========================================= */
+.timeline-wrapper { position: relative; margin: 30px 10px 40px 10px; }
+.timeline-track { position: absolute; top: 15px; left: 0; right: 0; height: 4px; background: #e3e3e8; z-index: 1; border-radius: 2px; }
+.timeline-track-fill { position: absolute; top: 0; left: 0; height: 100%; background: var(--apple-blue); border-radius: 2px; transition: width 0.4s ease; }
+.timeline-steps { display: flex; justify-content: space-between; position: relative; z-index: 2; }
+
+.step-circle { width: 34px; height: 34px; border-radius: 50%; background: var(--apple-card); border: 3px solid #e3e3e8; display: flex; justify-content: center; align-items: center; font-size: 13px; font-weight: 700; color: var(--apple-muted); transition: 0.3s; position: relative; }
+.step-circle:hover { border-color: var(--apple-muted); }
+.step-circle.completed { border-color: var(--apple-blue); background: var(--apple-blue); color: white; }
+.step-circle.active { border-color: var(--apple-blue); background: var(--apple-card); color: var(--apple-blue); box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.15); }
+.step-circle.success-end { border-color: #34c759; background: #34c759; color: white; box-shadow: 0 0 0 4px rgba(52, 199, 89, 0.2); }
+.step-circle.danger-end { border-color: #ff3b30; background: #ff3b30; color: white; }
+
+.step-label { position: absolute; top: 42px; font-size: 10px; text-align: center; width: 70px; left: 50%; transform: translateX(-50%); color: var(--apple-muted); font-weight: 600; line-height: 1.1; }
