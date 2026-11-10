@@ -21,15 +21,14 @@ let renderCallback = null;
 let viewingStep = 0; 
 let proactivoIndex = null;
 
-// =========================================================
-// 1. INICIALIZADOR PROTEGIDO (Espera al DOM)
-// =========================================================
+// ---------------------------------------------------------
+// SECCIÓN 1: INICIALIZADOR PROTEGIDO
+// ---------------------------------------------------------
 export function initPipelineManager(dbRef, syncFn, renderFn) {
     activeDatabase = dbRef;
     syncCallback = syncFn;
     renderCallback = renderFn;
 
-    // Conectar botón de cerrar timeline
     const btnClose = document.getElementById('btn-close-x');
     if (btnClose) {
         btnClose.addEventListener('click', () => { 
@@ -38,7 +37,6 @@ export function initPipelineManager(dbRef, syncFn, renderFn) {
         });
     }
 
-    // Conectar botones del modal Proactivo para evitar Error Null
     const btnProactivoYes = document.getElementById('btn-proactivo-yes');
     if (btnProactivoYes) {
         btnProactivoYes.addEventListener('click', async () => { 
@@ -53,7 +51,6 @@ export function initPipelineManager(dbRef, syncFn, renderFn) {
     if (btnProactivoNo) {
         btnProactivoNo.addEventListener('click', async () => { 
             const client = activeDatabase[proactivoIndex]; 
-            // Regresa a estado original
             await updateDoc(doc(db, "clientes", client.firebaseId), { contactado: '-', paso_actual: 0 }); 
             document.getElementById('proactivo-modal').classList.add('hidden'); 
             await syncCallback(); 
@@ -68,9 +65,9 @@ export function initPipelineManager(dbRef, syncFn, renderFn) {
     }
 }
 
-// =========================================================
-// 2. LÓGICA DE INTERFAZ Y MÁQUINA DE ESTADOS (VIAJE EN EL TIEMPO)
-// =========================================================
+// ---------------------------------------------------------
+// SECCIÓN 2: LÓGICA DE INTERFAZ Y MÁQUINA DE ESTADOS
+// ---------------------------------------------------------
 window.jumpToStep = function(stepIndex) {
     viewingStep = stepIndex;
     renderTimelineUI(activeDatabase[editingIndex]);
@@ -80,7 +77,6 @@ window.openModal = function(index) {
     editingIndex = index; 
     const d = activeDatabase[index];
     
-    // Asignar el paso actual que vamos a visualizar
     viewingStep = d.paso_actual || 0;
     if (d.agendo === 'SI' || d.contactado === 'CITA_EFECTIVA' || d.contactado === 'PROACTIVO_CONFIRMADO' || d.contactado === 'PERDIDO') {
         viewingStep = 6;
@@ -93,14 +89,12 @@ window.openModal = function(index) {
     document.getElementById('modal-tel').textContent = d.telefono || 'N/D';
     document.getElementById('modal-ult-servicio').textContent = d.ultimo_servicio || 'Por verificar';
     
-    // Formatear Importe si existe
     let importeFormat = 'No registrado';
     if(d.importe && !isNaN(parseFloat(d.importe))) {
         importeFormat = '$' + parseFloat(d.importe).toLocaleString('es-MX', {minimumFractionDigits: 2});
     }
     document.getElementById('modal-importe').textContent = importeFormat;
     
-    // Limpiar controles
     document.getElementById('timeline-reason').value = ""; 
     document.getElementById('pause-reason').value = ""; 
     document.getElementById('cita-date').value = "";
@@ -112,13 +106,17 @@ window.openModal = function(index) {
     document.getElementById('client-modal').classList.remove('hidden');
 };
 
+// PUENTE GLOBAL PARA CAMBIAR LAS VISTAS
+window.cambiarEstadoTimeline = function(nuevoEstado) {
+    renderTimelineUI(activeDatabase[editingIndex], nuevoEstado);
+};
+
 window.renderTimelineUI = function(client, stateOverride = 'DEFAULT') {
     let actualStep = client.paso_actual || 0;
     
     let isFinished = (client.contactado === 'CITA_EFECTIVA' || client.contactado === 'PROACTIVO_CONFIRMADO' || client.contactado === 'PERDIDO');
     if (client.agendo === 'SI' || isFinished) actualStep = 6; 
 
-    // 1. DIBUJAR CIRCULOS CLICABLES
     const stepsContainer = document.getElementById('timeline-steps-container'); 
     let circlesHtml = '';
     
@@ -130,7 +128,7 @@ window.renderTimelineUI = function(client, stateOverride = 'DEFAULT') {
         if (i === 6 && actualStep === 6) {
             if (client.contactado === 'CITA_EFECTIVA' || client.contactado === 'PROACTIVO_CONFIRMADO') circleClass += ' success-end'; 
             else if (client.contactado === 'PERDIDO') circleClass += ' danger-end';
-            else if (client.agendo === 'SI') circleClass += ' active'; // Esperando llegada
+            else if (client.agendo === 'SI') circleClass += ' active'; 
         }
         
         circlesHtml += `<div class="${circleClass}" style="cursor:pointer;" onclick="jumpToStep(${i})">
@@ -141,37 +139,36 @@ window.renderTimelineUI = function(client, stateOverride = 'DEFAULT') {
     stepsContainer.innerHTML = circlesHtml;
     document.getElementById('timeline-fill').style.width = `${(actualStep / (TIMELINE_STEPS.length - 1)) * 100}%`;
 
-    // 2. DIBUJAR BOTONES SEGÚN EL PASO VISUALIZADO
     const title = document.getElementById('action-title'); 
     const desc = document.getElementById('action-desc'); 
     const buttons = document.getElementById('action-buttons');
     
     if (viewingStep < 6) {
         title.textContent = `Gestión: ${TIMELINE_STEPS[viewingStep].name}`;
-        desc.textContent = "Registra la interacción con el cliente (Sin emojis):";
+        desc.textContent = "Registra la interacción con el cliente:";
         
         if (stateOverride === 'DEFAULT') {
             document.getElementById('pause-reason-container').classList.add('hidden'); 
             document.getElementById('cita-date-container').classList.add('hidden');
             document.getElementById('timeline-reason').classList.remove('hidden');
             buttons.innerHTML = `
-                <button class="btn-corp-primary" onclick="renderTimelineUI(activeDatabase[${editingIndex}], 'AGENDANDO')">Agendar Cita</button>
+                <button class="btn-corp-primary" onclick="cambiarEstadoTimeline('AGENDANDO')">Agendar Cita</button>
                 <button class="btn-corp-outline" onclick="procesarTimeline('AVANZAR')">Guardar y Avanzar</button>
-                <button class="btn-corp-danger" onclick="renderTimelineUI(activeDatabase[${editingIndex}], 'PAUSANDO')">Marcar como Perdido</button>
+                <button class="btn-corp-danger" onclick="cambiarEstadoTimeline('PAUSANDO')">Marcar como Perdido</button>
             `;
         } else if (stateOverride === 'AGENDANDO') {
             document.getElementById('timeline-reason').classList.add('hidden');
             document.getElementById('cita-date-container').classList.remove('hidden');
             buttons.innerHTML = `
                 <button class="btn-corp-primary" style="background:#34c759;" onclick="procesarTimeline('EXITO_CITA')">Confirmar Cita</button>
-                <button class="btn-corp-outline" onclick="renderTimelineUI(activeDatabase[${editingIndex}], 'DEFAULT')">Cancelar</button>
+                <button class="btn-corp-outline" onclick="cambiarEstadoTimeline('DEFAULT')">Cancelar</button>
             `;
         } else if (stateOverride === 'PAUSANDO') {
             document.getElementById('timeline-reason').classList.add('hidden');
             document.getElementById('pause-reason-container').classList.remove('hidden');
             buttons.innerHTML = `
                 <button class="btn-corp-danger" onclick="procesarTimeline('CONFIRMAR_PAUSA')">Confirmar Pérdida</button>
-                <button class="btn-corp-outline" onclick="renderTimelineUI(activeDatabase[${editingIndex}], 'DEFAULT')">Cancelar</button>
+                <button class="btn-corp-outline" onclick="cambiarEstadoTimeline('DEFAULT')">Cancelar</button>
             `;
         }
     } else {
@@ -182,10 +179,11 @@ window.renderTimelineUI = function(client, stateOverride = 'DEFAULT') {
         document.getElementById('cita-date-container').classList.add('hidden');
         
         if (client.agendo === 'SI' && client.contactado !== 'CITA_EFECTIVA') {
-            desc.textContent = "El cliente tiene una cita programada. ¿Asistió a su cita?";
+            // AQUÍ ESTÁ EL CAMBIO: Ya no se pueden autoevaluar.
+            desc.textContent = "Cita programada. La asistencia se validará en automático al cargar el Excel del Taller.";
             buttons.innerHTML = `
-                <button class="btn-corp-primary" style="background:#34c759;" onclick="procesarTimeline('LLEGO_CITA')">Sí, Cita Efectiva</button>
-                <button class="btn-corp-danger" onclick="renderTimelineUI(activeDatabase[${editingIndex}], 'PAUSANDO')">No asistió (Perdido)</button>
+                <button class="btn-corp-danger" onclick="cambiarEstadoTimeline('PAUSANDO')">Cancelar Cita (Perdido)</button>
+                <button class="btn-corp-outline" onclick="document.getElementById('client-modal').classList.add('hidden')">Cerrar Ventana</button>
             `;
         } else {
             desc.textContent = client.contactado === 'PERDIDO' ? `Perdido por: ${client.motivo_pausa}` : "Servicio Completado.";
@@ -194,6 +192,9 @@ window.renderTimelineUI = function(client, stateOverride = 'DEFAULT') {
     }
 }
 
+// ---------------------------------------------------------
+// SECCIÓN 3: PROCESAMIENTO Y GUARDADO A FIREBASE
+// ---------------------------------------------------------
 window.procesarTimeline = async function(tipoAccion) {
     const client = activeDatabase[editingIndex];
     const selectedReason = document.getElementById('timeline-reason').value;
@@ -225,15 +226,10 @@ window.procesarTimeline = async function(tipoAccion) {
         updateObj.motivo_pausa = motivo;
         logMsg = `${fechaLog} | CLIENTE PERDIDO: ${motivo}.`;
     }
-    else if (tipoAccion === 'LLEGO_CITA') {
-        updateObj.contactado = 'CITA_EFECTIVA';
-        logMsg = `${fechaLog} | CITA EFECTIVA (El cliente asistió al taller).`;
-    }
     else if (tipoAccion === 'AVANZAR') {
         if(!selectedReason) return alert("Selecciona un motivo del listado superior.");
         let nextStep = viewingStep + 1;
         
-        // Si retoma a un cliente perdido o agendado desde un paso anterior
         if (client.agendo === 'SI' || client.contactado === 'PERDIDO' || client.paso_actual >= 6) {
             updateObj.agendo = 'NO'; 
             updateObj.contactado = 'PENDIENTE'; 
@@ -261,9 +257,9 @@ window.procesarTimeline = async function(tipoAccion) {
     syncCallback(); 
 };
 
-// =========================================================
-// 3. FUNCIONES GLOBALES (Expuestas)
-// =========================================================
+// ---------------------------------------------------------
+// SECCIÓN 4: FUNCIONES GLOBALES DE MODALES EXTRAS
+// ---------------------------------------------------------
 function renderModalHistory(client) { 
     document.getElementById('modal-history').innerHTML = (client.llamadas || []).length === 0 ? "<em>Sin historial previo.</em>" : (client.llamadas || []).slice().reverse().map((f) => `<div style="margin-bottom:8px; border-bottom: 1px solid #eee; padding-bottom: 5px; color:#495057;">${f}</div>`).join(''); 
 }

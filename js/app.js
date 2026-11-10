@@ -4,12 +4,12 @@
 // =====================================================================
 
 // ---------------------------------------------------------
-// SECCIÓN 1: IMPORTS DE MÓDULOS Y DEPENDENCIAS
+// SECCIÓN 1: IMPORTS DE MÓDULOS Y DEPENDENCIAS (CACHE-BUSTER)
 // ---------------------------------------------------------
 import { db, collection, getDocs, doc, writeBatch, updateDoc } from './config/firebaseConfig.js';
-import { processMainBaseActivos, crossReferenceServicesActivos, enrichClientDataActivos, markEffectiveAppointments } from './logic/activosLogic.js';
-import { initAuth, adminMode } from './auth/accessController.js';
-import { initPipelineManager } from './ui/pipelineManager.js';
+import { processMainBaseActivos, crossReferenceServicesActivos, enrichClientDataActivos, markEffectiveAppointments } from './logic/activosLogic.js?v=2.0';
+import { initAuth, adminMode } from './auth/accessController.js?v=2.0';
+import { initPipelineManager } from './ui/pipelineManager.js?v=2.0';
 // ---------------------------------------------------------
 // SECCIÓN 2: ESTADO GLOBAL Y MEMORIA EN TIEMPO REAL
 // ---------------------------------------------------------
