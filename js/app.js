@@ -140,15 +140,12 @@ document.getElementById('search-input').addEventListener('input', renderTable);
 // SECCIÓN 7: RUTINAS DE CARGA DE EXCEL (PANEL ADMIN 0520)
 // ---------------------------------------------------------
 
-// 7.1 Botón 1: Subir Base Nueva
 document.getElementById('btn-process-excel').addEventListener('click', async () => {
     const adminPass = prompt("Ingresa la clave de Autorización (4 dígitos) para subir la base:");
     if (adminPass !== "2099") return alert("Clave incorrecta. Operación cancelada.");
     const file = document.getElementById('excel-upload').files[0];
     const mesTrabajo = document.getElementById('upload-mes').value; 
-    
     if (!mesTrabajo || !file) return alert("Por favor, selecciona el mes de trabajo y el archivo.");
-    
     uploadStatus.textContent = "Analizando fechas y detectando Proactivos ⏳..."; 
     try {
         const result = await processMainBaseActivos(file, activeTab, mesTrabajo);
@@ -172,7 +169,6 @@ async function finalizeBaseUpload() {
 document.getElementById('btn-confirm-base').addEventListener('click', finalizeBaseUpload);
 document.getElementById('btn-cancel-base').addEventListener('click', () => { document.getElementById('base-report-modal').classList.add('hidden'); tempNewRecords = []; });
 
-// 7.2 Botón 2: Actualizar Teléfonos
 const btnTelefonos = document.getElementById('btn-process-telefonos');
 if(btnTelefonos) {
     btnTelefonos.addEventListener('click', async () => {
@@ -194,12 +190,10 @@ if(btnTelefonos) {
     });
 }
 
-// 7.3 Botón 3: Filtro de Calidad (KMs y Cortesías)
 document.getElementById('btn-process-asesores').addEventListener('click', async () => {
     const files = document.getElementById('excel-asesores').files;
     if (files.length === 0) return alert("Selecciona los archivos para Filtrar Asesores."); 
     uploadStatus.textContent = "Cruzando asesores y purgando... ⏳"; 
-    
     try {
         const result = await crossReferenceServicesActivos(files, database.filter(d => d.tab_type === activeTab));
         tempSafeDatabase = [...result.verified, ...result.unaffected]; tempPendingPurge = result.pendingPurge;
@@ -232,7 +226,6 @@ document.getElementById('btn-confirm-purge').addEventListener('click', async () 
 });
 document.getElementById('btn-cancel-report').addEventListener('click', () => { document.getElementById('report-modal').classList.add('hidden'); });
 
-// 7.4 Botón 4: Citas Efectivas (POR VIN Y FACTURA)
 const btnEfectivas = document.getElementById('btn-process-efectivas');
 if (btnEfectivas) {
     btnEfectivas.addEventListener('click', async () => {
@@ -249,7 +242,8 @@ if (btnEfectivas) {
                 const batch = writeBatch(db);
                 resultUpdates.forEach(updateObj => { 
                     batch.update(doc(db, "clientes", updateObj.firebaseId), {
-                        servicio_realizado: updateObj.servicio_realizado, // Se guarda el nuevo servicio realizado hoy
+                        servicio_realizado: updateObj.servicio_realizado, 
+                        fecha_factura_efectiva: updateObj.fecha_factura_efectiva, // Se guarda la fecha
                         contactado: updateObj.contactado
                     }); 
                 });
@@ -274,28 +268,21 @@ function calculateNextContact(client) {
     if (!client.proximo_servicio || client.proximo_servicio === "Sin Fecha") return { dateObj: null, text: 'N/D', isOverdue: false };
     const p = client.proximo_servicio.split('/');
     if (p.length !== 3) return { dateObj: null, text: 'N/D', isOverdue: false };
-    
-    const targetDate = new Date(p[2], p[1]-1, p[0]); // Fecha límite (6 meses)
+    const targetDate = new Date(p[2], p[1]-1, p[0]);
     let step = client.paso_actual || 0;
-    
     const diasRestar = [45, 30, 21, 15, 11, 3, 0];
     let daysToSub = (step >= 0 && step < 7) ? diasRestar[step] : 0;
-
     targetDate.setDate(targetDate.getDate() - daysToSub);
-    
     const dd = String(targetDate.getDate()).padStart(2, '0'); 
     const mm = String(targetDate.getMonth()+1).padStart(2, '0');
     const today = new Date(); today.setHours(0,0,0,0);
-    const isOverdue = targetDate <= today; 
-    
-    return { dateObj: targetDate, text: `${dd}/${mm}/${targetDate.getFullYear()}`, isOverdue: isOverdue };
+    return { dateObj: targetDate, text: `${dd}/${mm}/${targetDate.getFullYear()}`, isOverdue: targetDate <= today };
 }
 
 function renderTable() {
     const mesActual = inputMesFiltro.value;
     let baseData = activeTab === 'papelera' ? database.filter(d => d.tab_type === 'papelera' && d.old_tab === papeleraSubTab) : database.filter(d => d.tab_type === activeTab && d.mes_anio === mesActual);
     
-    // Asignación de KPIs Superiores
     if (activeTab !== 'papelera') {
         document.getElementById('stat-total').textContent = baseData.length;
         document.getElementById('stat-reactivos').textContent = baseData.filter(d => d.contactado !== 'CITA_EFECTIVA' && d.contactado !== 'PROACTIVO_CONFIRMADO' && d.contactado !== 'PERDIDO' && d.contactado !== 'PROACTIVO' && d.agendo !== 'SI').length;
@@ -307,7 +294,6 @@ function renderTable() {
     
     let dataToShow = [...baseData];
     
-    // Reglas de Filtrado de los 6 Estados
     if (activeTab !== 'papelera') {
         if (currentFilter === 'proactivos') {
             dataToShow = dataToShow.filter(d => d.contactado === 'PROACTIVO' || d.contactado === 'PROACTIVO_CONFIRMADO');
@@ -337,18 +323,31 @@ function renderTable() {
         dataToShow = dataToShow.filter(d => String(d.orden || '').toLowerCase().includes(searchTerm) || String(d.vin || '').toLowerCase().includes(searchTerm) || String(d.cliente || '').toLowerCase().includes(searchTerm)); 
     }
     
-    // Cabeceras Dinámicas Elegantes
+    // CABECERAS DINÁMICAS (Lógica de Permisos)
     const thead = document.querySelector('.corp-table thead');
-    let extraHeaders = ''; let dynamicDateCol = '<th>PRÓXIMO (6M)</th>';
+    let extraHeaders = ''; 
+    let dynamicDateCol = '<th>PRÓXIMO (6M)</th>';
+    let statusHeader = '<th>ESTATUS</th>';
+    let actionHeader = '<th style="text-align: right;">ACCIÓN</th>';
+
+    if (currentFilter === 'proactivos') { 
+        extraHeaders = '<th>ASESOR</th>'; 
+        dynamicDateCol = '<th>FECHA SERVICIO</th>';
+    } else if (currentFilter === 'reactivos') { 
+        dynamicDateCol = '<th>PRÓXIMO CONTACTO</th>';
+    } else if (currentFilter === 'agendados') { 
+        dynamicDateCol = '<th>FECHA CITA</th>';
+        if (adminMode) extraHeaders = '<th>RETORNO</th>'; // Solo el Admin (0520) ve Retorno
+    } else if (currentFilter === 'efectivas') { 
+        dynamicDateCol = '<th style="color:#34c759;">SERVICIO REALIZADO</th>'; 
+        statusHeader = '<th style="color:#34c759;">FECHA FACTURA</th>'; 
+        actionHeader = ''; // Nadie puede gestionar efectivas
+    } else if (currentFilter === 'perdidos') { 
+        dynamicDateCol = '<th>MOTIVO PÉRDIDA</th>'; 
+        if (!adminMode) actionHeader = ''; // Operadoras no ven el botón de rescatar perdidos
+    }
     
-    if (currentFilter === 'proactivos') { extraHeaders = '<th>ASESOR</th>'; dynamicDateCol = '<th>FECHA SERVICIO</th>';
-    } else if (currentFilter === 'reactivos') { dynamicDateCol = '<th>PRÓXIMO CONTACTO</th>';
-    } else if (currentFilter === 'agendados') { dynamicDateCol = '<th>FECHA CITA</th>';
-    // AQUÍ SE AGREGA LA NUEVA COLUMNA DE "SERVICIO REALIZADO" PARA CITAS EFECTIVAS:
-    } else if (currentFilter === 'efectivas') { dynamicDateCol = '<th style="color:#34c759;">SERVICIO REALIZADO</th>'; 
-    } else if (currentFilter === 'perdidos') { dynamicDateCol = '<th>MOTIVO PÉRDIDA</th>'; }
-    
-    thead.innerHTML = `<tr><th>ORDEN / VIN</th><th>CLIENTE</th><th>TELÉFONO</th>${extraHeaders}<th>ÚLTIMO SERVICIO</th>${dynamicDateCol}<th>ESTATUS</th><th style="text-align: right;">ACCIÓN</th></tr>`;
+    thead.innerHTML = `<tr><th>ORDEN / VIN</th><th>CLIENTE</th><th>TELÉFONO</th>${extraHeaders}<th>ÚLTIMO SERVICIO</th>${dynamicDateCol}${statusHeader}${actionHeader}</tr>`;
 
     if (dataToShow.length === 0) { tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#86868b; padding: 40px;">No hay registros en esta etapa.</td></tr>`; return; }
     
@@ -364,9 +363,14 @@ function renderTable() {
         else if (d.agendo === 'SI') statusTag = '<span class="status-dot st-agendado"></span>Agendado';
         else statusTag = '<span class="status-dot st-reactivo"></span>Por Contactar';
 
-        let actionButtons = `<button class="btn-action-clean" onclick="window.openModal(${realIndex})">Gestionar</button>`;
-        if (activeTab === 'papelera') actionButtons = `<button class="btn-action-clean" onclick="window.restoreClient(${realIndex})">Restaurar</button>`;
-        else if (adminMode) actionButtons += `<button class="btn-action-clean" style="color:#ff3b30; margin-left:10px;" onclick="window.deleteClient(${realIndex})">Eliminar</button>`;
+        // ACCIONES GLOBALES
+        let tdAction = '';
+        if (actionHeader !== '') {
+            let actionButtons = `<button class="btn-action-clean" onclick="window.openModal(${realIndex})">Gestionar</button>`;
+            if (activeTab === 'papelera') actionButtons = `<button class="btn-action-clean" onclick="window.restoreClient(${realIndex})">Restaurar</button>`;
+            else if (adminMode) actionButtons += `<button class="btn-action-clean" style="color:#ff3b30; margin-left:10px;" onclick="window.deleteClient(${realIndex})">Eliminar</button>`;
+            tdAction = `<td style="text-align:right;">${actionButtons}</td>`;
+        }
 
         let fechaColHtml = d.proximo_servicio;
         if (currentFilter === 'proactivos') fechaColHtml = d.fecha_proactivo || d.proximo_servicio || '-';
@@ -374,35 +378,47 @@ function renderTable() {
             const nextCont = calculateNextContact(d);
             fechaColHtml = nextCont.isOverdue ? `<span style="color:#ff3b30; font-weight:600;">${nextCont.text} (Atrasado)</span>` : `<span style="color:#86868b;">${nextCont.text}</span>`;
         } else if (currentFilter === 'agendados') {
-            if (d.fecha_cita) { const cd = new Date(d.fecha_cita); fechaColHtml = `<span style="color:#1d1d1f; font-weight:600;">${String(cd.getDate()).padStart(2,'0')}/${String(cd.getMonth()+1).padStart(2,'0')} - ${String(cd.getHours()).padStart(2,'0')}:${String(cd.getMinutes()).padStart(2,'0')}</span>`; }
-        // Y AQUÍ SE IMPRIME LO QUE SE LE HIZO REALMENTE ESTE MES
+            if (d.fecha_cita) { 
+                const parts = d.fecha_cita.split('-'); // 2026-11-20 -> [2026, 11, 20]
+                if(parts.length === 3) fechaColHtml = `<span style="color:#1d1d1f; font-weight:600;">${parts[2]}/${parts[1]}/${parts[0]}</span>`;
+                else fechaColHtml = `<span style="color:#1d1d1f; font-weight:600;">${d.fecha_cita}</span>`; 
+            }
         } else if (currentFilter === 'efectivas') { 
             fechaColHtml = `<span style="color:#34c759; font-weight:700; font-size:11px;">${d.servicio_realizado || 'Mantenimiento Confirmado'}</span>`; 
         } else if (currentFilter === 'perdidos') { fechaColHtml = `<span style="color:#86868b;">${d.motivo_pausa || 'Sin motivo'}</span>`; }
 
-        let asesorTd = '';
+        // COLUMNAS EXTRA Y DE RETORNO
+        let extraTd = '';
         if (currentFilter === 'proactivos') {
             let nA = d.asesor_proactivo || 'N/A';
             if (nA.toUpperCase().includes('JARED')) nA = 'Jared'; else if (nA.toUpperCase().includes('EUGENIA')) nA = 'Eugenia';
-            asesorTd = `<td><span style="color:#5e5ce6; font-weight:600;">${nA}</span></td>`;
+            extraTd = `<td><span style="color:#5e5ce6; font-weight:600;">${nA}</span></td>`;
+        } else if (currentFilter === 'agendados' && adminMode) {
+            extraTd = `<td><button class="btn-corp-outline" style="font-size:10px; padding:4px 8px; color:#ff9f0a; border-color:#ff9f0a;" onclick="window.returnToReactivo(${realIndex})">↺ Retornar</button></td>`;
+        }
+
+        // STATUS O FECHA DE FACTURA
+        let statusTagOrDate = statusTag;
+        if (currentFilter === 'efectivas') {
+            statusTagOrDate = `<span style="font-weight:700; color:var(--apple-text);">${d.fecha_factura_efectiva || 'Sin Fecha'}</span>`;
         }
 
         html += `<tr>
             <td><strong>${d.orden_proactivo || d.orden}</strong><br><span style="font-size:11px; color:var(--apple-muted);">${d.vin || 'N/D'}</span></td>
             <td><div style="font-weight:600;">${d.cliente}</div></td>
             <td>${d.telefono}</td>
-            ${asesorTd}
+            ${extraTd}
             <td><div style="font-size:11px; color:var(--apple-muted);">${d.servicio_proactivo || d.ultimo_servicio || 'Por verificar'}</div></td>
             <td>${fechaColHtml}</td>
-            <td><div style="font-size:12px; font-weight:600; color:var(--apple-text);">${statusTag}</div></td>
-            <td style="text-align:right;">${actionButtons}</td>
+            <td><div style="font-size:12px; font-weight:600; color:var(--apple-text);">${statusTagOrDate}</div></td>
+            ${tdAction}
         </tr>`;
     });
     tableBody.innerHTML = html;
 }
 
 // ---------------------------------------------------------
-// SECCIÓN 9: FUNCIONES GLOBALES (Papelera)
+// SECCIÓN 9: FUNCIONES GLOBALES (Papelera y Retornos)
 // ---------------------------------------------------------
 window.deleteClient = async function(realIndex) { 
     if(confirm("¿Enviar a papelera?")) { 
@@ -414,4 +430,17 @@ window.deleteClient = async function(realIndex) {
 window.restoreClient = async function(realIndex) { 
     await updateDoc(doc(db, "clientes", database[realIndex].firebaseId), { tab_type: database[realIndex].old_tab, old_tab: null }); 
     await syncWithFirebase(); 
+};
+
+window.returnToReactivo = async function(realIndex) {
+    if(confirm("¿Seguro que deseas retornar este cliente a REACTIVOS? Se cancelará su cita agendada.")) {
+        const client = database[realIndex];
+        await updateDoc(doc(db, "clientes", client.firebaseId), { 
+            agendo: 'NO', 
+            contactado: 'PENDIENTE',
+            fecha_cita: null // Se borra la fecha para que inicie limpio
+        }); 
+        await syncWithFirebase(); 
+        alert("Cliente retornado a Reactivos exitosamente.");
+    }
 };

@@ -219,19 +219,19 @@ export async function crossReferenceServicesActivos(files, currentDatabase) {
 export async function markEffectiveAppointments(fileFacturas, fileAsesores, currentDatabase) {
     return new Promise(async (resolve, reject) => {
         try {
-            // PASO A: Relacionar Facturas con VIN
             const dataFacturas = await readFileAsArrayBuffer(fileFacturas);
             const wbFacturas = XLSX.read(dataFacturas, { type: 'array' });
             const rawFacturas = XLSX.utils.sheet_to_json(wbFacturas.Sheets[wbFacturas.SheetNames[0]], { defval: "" });
 
-            const mapFacturaToVin = {};
+            // Ahora guardamos el VIN y la FECHA de la factura
+            const mapFacturaData = {};
             rawFacturas.forEach(row => {
                 const factura = String(row['Factura'] || '').trim().toUpperCase();
                 const vin = String(row['No. SERIE'] || row['VIN'] || '').trim().toUpperCase();
-                if (factura && vin) mapFacturaToVin[factura] = vin;
+                const fechaFac = String(row['FECHA'] || '').trim(); // Extraemos la fecha
+                if (factura && vin) mapFacturaData[factura] = { vin: vin, fechaFac: fechaFac };
             });
 
-            // PASO B: Identificar Servicios Reales del Asesor
             const dataAsesores = await readFileAsArrayBuffer(fileAsesores);
             const wbAsesores = XLSX.read(dataAsesores, { type: 'array' });
             const rawAsesores = XLSX.utils.sheet_to_json(wbAsesores.Sheets[wbAsesores.SheetNames[0]], { range: 3, defval: "" }); 
@@ -243,24 +243,23 @@ export async function markEffectiveAppointments(fileFacturas, fileAsesores, curr
                 const descripcion = String(row['DESCRIPCION'] || '').trim();
 
                 if (factura && clasificacion === 'MO DE MANTENIMIENTO') {
-                    const vin = mapFacturaToVin[factura];
-                    if (vin) {
-                        if (!mapVinToServicio[vin]) mapVinToServicio[vin] = [];
-                        mapVinToServicio[vin].push(descripcion);
+                    const facData = mapFacturaData[factura];
+                    if (facData && facData.vin) {
+                        if (!mapVinToServicio[facData.vin]) mapVinToServicio[facData.vin] = { descripciones: [], fecha_factura: facData.fechaFac };
+                        mapVinToServicio[facData.vin].descripciones.push(descripcion);
                     }
                 }
             });
 
-            // PASO C: Marcar Citas Efectivas en la Base de Datos Activa
             let verifiedRecords = [];
             currentDatabase.forEach(client => {
                 const dbVin = String(client.vin || '').trim().toUpperCase();
-                const serviciosRealizados = mapVinToServicio[dbVin];
+                const dataServicio = mapVinToServicio[dbVin];
                 
-                if (serviciosRealizados && serviciosRealizados.length > 0) {
+                if (dataServicio && dataServicio.descripciones.length > 0) {
                     let maxKms = -1; let mejorServicio = "Mantenimiento Confirmado"; 
                     
-                    serviciosRealizados.forEach(desc => {
+                    dataServicio.descripciones.forEach(desc => {
                         const match = desc.match(/([\d,]+)\s*KMS/i);
                         if (match) {
                             const kmsNumber = parseInt(match[1].replace(/,/g, '')); 
@@ -268,9 +267,11 @@ export async function markEffectiveAppointments(fileFacturas, fileAsesores, curr
                         } else { if(maxKms === -1) mejorServicio = desc; }
                     });
                     
+                    // Empujamos la fecha real de la factura
                     verifiedRecords.push({
                         firebaseId: client.firebaseId,
                         servicio_realizado: mejorServicio, 
+                        fecha_factura_efectiva: dataServicio.fecha_factura,
                         contactado: 'CITA_EFECTIVA'
                     });
                 }
