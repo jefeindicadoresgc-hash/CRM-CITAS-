@@ -4,12 +4,14 @@
 // =====================================================================
 
 // ---------------------------------------------------------
-// SECCIÓN 1: IMPORTS DE MÓDULOS Y DEPENDENCIAS (CACHE-BUSTER)
+// SECCIÓN 1: IMPORTS DE MÓDULOS Y DEPENDENCIAS (CACHE-BUSTER 2.3)
 // ---------------------------------------------------------
 import { db, collection, getDocs, doc, writeBatch, updateDoc } from './config/firebaseConfig.js';
-import { processMainBaseActivos, crossReferenceServicesActivos, enrichClientDataActivos, markEffectiveAppointments } from './logic/activosLogic.js?v=2.0';
-import { initAuth, adminMode } from './auth/accessController.js?v=2.0';
-import { initPipelineManager } from './ui/pipelineManager.js?v=2.0';
+import { processMainBaseActivos, crossReferenceServicesActivos, enrichClientDataActivos, markEffectiveAppointments } from './logic/activosLogic.js?v=2.3';
+import { processPrimerServicioBase } from './logic/primerServicioLogic.js?v=2.3';
+import { initAuth, adminMode } from './auth/accessController.js?v=2.3';
+import { initPipelineManager } from './ui/pipelineManager.js?v=2.3';
+
 // ---------------------------------------------------------
 // SECCIÓN 2: ESTADO GLOBAL Y MEMORIA EN TIEMPO REAL
 // ---------------------------------------------------------
@@ -30,7 +32,6 @@ inputMesFiltro.addEventListener('change', renderTable);
 // SECCIÓN 3: RUTINAS DE INICIALIZACIÓN (BOOT)
 // ---------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
-    // A) Inyectar mes actual automáticamente
     const today = new Date();
     const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
     const uploadInput = document.getElementById('upload-mes');
@@ -38,23 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if(uploadInput) uploadInput.value = currentMonthStr;
     if(inputMesFiltro) inputMesFiltro.value = currentMonthStr;
 
-    // B) Iniciar Módulos de Control
     initAuth(syncWithFirebase, renderTable);
     initPipelineManager(database, syncWithFirebase, renderTable);
-    
-    // C) Evento de Formateo Global
-    const btnClear = document.getElementById('btn-clear-data');
-    if(btnClear) {
-        btnClear.addEventListener('click', async () => { 
-            if (prompt("Clave de Seguridad Administrativa para BORRAR LA NUBE:") === "2099") { 
-                const batch = writeBatch(db); 
-                database.forEach(d => { if(d.firebaseId) batch.delete(doc(db, "clientes", d.firebaseId)); }); 
-                await batch.commit(); 
-                await syncWithFirebase(); 
-                alert("Base de datos en la nube formateada exitosamente."); 
-            } 
-        });
-    }
 });
 
 // ---------------------------------------------------------
@@ -87,20 +73,18 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         
         if (activeTab === 'papelera') {
             document.getElementById('table-title').textContent = "Papelera de Reciclaje";
-            document.getElementById('upload-panel').classList.add('hidden'); 
-            document.getElementById('stats-panel').classList.add('hidden'); 
             document.getElementById('view-filters').classList.add('hidden'); 
+            document.getElementById('stats-panel').classList.add('hidden'); 
             document.getElementById('papelera-filters').classList.remove('hidden');
         } else {
             document.getElementById('table-title').textContent = "Directorio de Clientes";
-            if (adminMode && activeTab === 'activos') document.getElementById('upload-panel').classList.remove('hidden'); 
-            else document.getElementById('upload-panel').classList.add('hidden');
-            
             document.getElementById('stats-panel').classList.remove('hidden'); 
             document.getElementById('view-filters').classList.remove('hidden'); 
             document.getElementById('papelera-filters').classList.add('hidden');
         }
-        uploadStatus.textContent = ""; renderTable();
+        
+        uploadStatus.textContent = ""; 
+        renderTable();
     });
 });
 
@@ -137,18 +121,24 @@ document.getElementById('search-input').addEventListener('input', renderTable);
 
 
 // ---------------------------------------------------------
-// SECCIÓN 7: RUTINAS DE CARGA DE EXCEL (PANEL ADMIN 0520)
+// SECCIÓN 7: RUTINAS DE CARGA Y LIMPIEZA (PANEL ADMIN 0520)
 // ---------------------------------------------------------
-
 document.getElementById('btn-process-excel').addEventListener('click', async () => {
     const adminPass = prompt("Ingresa la clave de Autorización (4 dígitos) para subir la base:");
     if (adminPass !== "2099") return alert("Clave incorrecta. Operación cancelada.");
     const file = document.getElementById('excel-upload').files[0];
     const mesTrabajo = document.getElementById('upload-mes').value; 
     if (!mesTrabajo || !file) return alert("Por favor, selecciona el mes de trabajo y el archivo.");
-    uploadStatus.textContent = "Analizando fechas y detectando Proactivos ⏳..."; 
+    
+    uploadStatus.textContent = activeTab === 'primer' ? "Analizando Libro de Ventas ⏳..." : "Analizando fechas y detectando Proactivos ⏳..."; 
     try {
-        const result = await processMainBaseActivos(file, activeTab, mesTrabajo);
+        let result;
+        if (activeTab === 'primer') {
+            result = await processPrimerServicioBase(file, activeTab, mesTrabajo);
+        } else {
+            result = await processMainBaseActivos(file, activeTab, mesTrabajo);
+        }
+        
         tempNewRecords = result.newRecords;
         if (result.discardedRecords.length > 0) {
             document.getElementById('base-report-list').innerHTML = '<ul>' + result.discardedRecords.map(msg => `<li>${msg}</li>`).join('') + '</ul>';
@@ -231,32 +221,96 @@ if (btnEfectivas) {
     btnEfectivas.addEventListener('click', async () => {
         const fileFacturas = document.getElementById('excel-facturas').files[0];
         const fileAsesores = document.getElementById('excel-efectivas').files[0];
+        const mesTrabajo = document.getElementById('upload-mes').value; 
         
-        if (!fileFacturas || !fileAsesores) return alert("Debes subir ambos archivos (Facturas y Asesores) para cruzar los VIN."); 
+        if (!fileFacturas || !fileAsesores || !mesTrabajo) return alert("Debes seleccionar el mes y subir ambos archivos (Facturas y Asesores)."); 
         
-        uploadStatus.textContent = "Analizando Facturas y VINs para confirmar Asistencias... ⏳"; 
+        uploadStatus.textContent = "Analizando Facturas y VINs (Aplicando regla de 15 días)... ⏳"; 
         try {
-            const resultUpdates = await markEffectiveAppointments(fileFacturas, fileAsesores, database.filter(d => d.tab_type === activeTab));
+            const resultUpdates = await markEffectiveAppointments(fileFacturas, fileAsesores, database.filter(d => d.tab_type === activeTab), mesTrabajo);
             
             if (resultUpdates.length > 0) {
                 const batch = writeBatch(db);
                 resultUpdates.forEach(updateObj => { 
                     batch.update(doc(db, "clientes", updateObj.firebaseId), {
                         servicio_realizado: updateObj.servicio_realizado, 
-                        fecha_factura_efectiva: updateObj.fecha_factura_efectiva, // Se guarda la fecha
-                        contactado: updateObj.contactado
+                        fecha_factura_efectiva: updateObj.fecha_factura_efectiva, 
+                        contactado: updateObj.contactado 
                     }); 
                 });
                 await batch.commit(); 
                 await syncWithFirebase();
-                alert(`✅ ¡ÉXITO! Se encontraron y marcaron ${resultUpdates.length} Citas Efectivas.`);
+                alert(`✅ ¡ÉXITO! Se marcaron ${resultUpdates.length} servicios cruzados exitosamente.`);
             } else {
-                alert("⚠️ No se encontraron coincidencias para Citas Efectivas. Verifica los archivos.");
+                alert("⚠️ No se encontraron coincidencias para Citas. Verifica los archivos.");
                 uploadStatus.textContent = "";
             }
         } catch (err) { 
             console.error(err); 
-            uploadStatus.textContent = "Error al procesar Citas Efectivas.";
+            uploadStatus.textContent = "Error al procesar el Cruce Taller.";
+        }
+    });
+}
+
+// =========================================================
+// NUEVA FUNCIÓN: PURGADO INTELIGENTE (BÓVEDA DE RESPALDO)
+// =========================================================
+const btnClearSmart = document.getElementById('btn-clear-data-smart');
+if (btnClearSmart) {
+    btnClearSmart.addEventListener('click', async () => {
+        const mesTrabajo = document.getElementById('upload-mes').value;
+        if (!mesTrabajo) return alert("Primero selecciona el 'Mes a trabajar' en la Tarjeta 1.");
+
+        // Definir qué pestaña estamos borrando
+        const targetTab = activeTab === 'papelera' ? papeleraSubTab : activeTab;
+        
+        // Extraer los registros exactos a mover (Los de la tabla activa + Los que ya estaban en papelera de ese mismo mes/origen)
+        const registrosABorrar = database.filter(d => 
+            (d.tab_type === targetTab && d.mes_anio === mesTrabajo) || 
+            (d.tab_type === 'papelera' && d.old_tab === targetTab && d.mes_anio === mesTrabajo)
+        );
+
+        if (registrosABorrar.length === 0) return alert(`No hay registros de ${targetTab.toUpperCase()} en el mes ${mesTrabajo} para purgar.`);
+
+        if (prompt("⚠️ ZONA DE PELIGRO ⚠️\nPara continuar, ingresa tu clave de autorización (4 dígitos):") !== "2099") {
+            return alert("Clave incorrecta. Operación cancelada.");
+        }
+
+        const confirmacion = confirm(`⚠️ ADVERTENCIA FINAL ⚠️\n\nEstás a punto de ELIMINAR ${registrosABorrar.length} clientes correspondientes a:\n\n- Origen: ${targetTab.toUpperCase()}\n- Mes: ${mesTrabajo}\n\nLos registros desaparecerán de esta tabla pero se moverán a la "Bóveda de Respaldo" secreta por 30 días.\n\n¿Estás completamente seguro de continuar?`);
+        if (!confirmacion) return;
+
+        uploadStatus.textContent = "Moviendo a Bóveda de Respaldo y limpiando nube... ⏳";
+        
+        try {
+            const batch = writeBatch(db);
+            
+            // Calculamos la fecha de caducidad (Hoy + 30 días)
+            const hoy = new Date();
+            const caducidad = new Date(hoy);
+            caducidad.setDate(caducidad.getDate() + 30);
+
+            registrosABorrar.forEach(client => {
+                if (client.firebaseId) {
+                    // 1. Crear copia en la colección secreta 'respaldo_emergencia'
+                    const backupRef = doc(collection(db, "respaldo_emergencia"), client.firebaseId);
+                    batch.set(backupRef, { 
+                        ...client, 
+                        fecha_ingreso_boveda: hoy.toISOString(),
+                        fecha_caducidad: caducidad.toISOString() 
+                    });
+                    
+                    // 2. Borrar permanentemente de la colección principal 'clientes'
+                    const mainRef = doc(db, "clientes", client.firebaseId);
+                    batch.delete(mainRef);
+                }
+            });
+
+            await batch.commit();
+            await syncWithFirebase();
+            alert(`✅ Limpieza exitosa. ${registrosABorrar.length} registros fueron enviados a la Bóveda de Respaldo.`);
+        } catch (error) {
+            console.error("Error al purgar:", error);
+            uploadStatus.textContent = "Error al limpiar la nube.";
         }
     });
 }
@@ -280,6 +334,34 @@ function calculateNextContact(client) {
 }
 
 function renderTable() {
+    // =========================================================
+    // NUEVO: CONTROL DINÁMICO DEL PANEL ADMIN (0520)
+    // =========================================================
+    const panelTitle = document.getElementById('title-upload-base');
+    const panelDesc = document.getElementById('desc-upload-base');
+    const panelOp2 = document.getElementById('panel-opcion-2');
+    const panelOp3 = document.getElementById('panel-opcion-3');
+    
+    if (activeTab === 'papelera' || !adminMode) {
+        document.getElementById('upload-panel').classList.add('hidden');
+    } else if (adminMode && (activeTab === 'activos' || activeTab === 'primer')) {
+        document.getElementById('upload-panel').classList.remove('hidden');
+        if (panelTitle && panelDesc) {
+            if (activeTab === 'primer') {
+                panelTitle.textContent = "1. Subir Libro de Ventas";
+                panelDesc.textContent = "(Calcula 6 meses desde Fecha Entrega)";
+                if(panelOp2) panelOp2.classList.add('hidden');
+                if(panelOp3) panelOp3.classList.add('hidden');
+            } else {
+                panelTitle.textContent = "1. Subir Base (Clave 2099)";
+                panelDesc.textContent = "(Filtra a 6 meses y detecta Proactivos)";
+                if(panelOp2) panelOp2.classList.remove('hidden');
+                if(panelOp3) panelOp3.classList.remove('hidden');
+            }
+        }
+    }
+    // =========================================================
+
     const mesActual = inputMesFiltro.value;
     let baseData = activeTab === 'papelera' ? database.filter(d => d.tab_type === 'papelera' && d.old_tab === papeleraSubTab) : database.filter(d => d.tab_type === activeTab && d.mes_anio === mesActual);
     
@@ -323,28 +405,31 @@ function renderTable() {
         dataToShow = dataToShow.filter(d => String(d.orden || '').toLowerCase().includes(searchTerm) || String(d.vin || '').toLowerCase().includes(searchTerm) || String(d.cliente || '').toLowerCase().includes(searchTerm)); 
     }
     
-    // CABECERAS DINÁMICAS (Lógica de Permisos)
     const thead = document.querySelector('.corp-table thead');
     let extraHeaders = ''; 
     let dynamicDateCol = '<th>PRÓXIMO (6M)</th>';
     let statusHeader = '<th>ESTATUS</th>';
     let actionHeader = '<th style="text-align: right;">ACCIÓN</th>';
 
-    if (currentFilter === 'proactivos') { 
+    if (activeTab === 'primer' && currentFilter !== 'efectivas' && currentFilter !== 'perdidos') {
+        extraHeaders = '<th>VENDEDOR</th>';
+    } else if (currentFilter === 'proactivos') { 
         extraHeaders = '<th>ASESOR</th>'; 
         dynamicDateCol = '<th>FECHA SERVICIO</th>';
-    } else if (currentFilter === 'reactivos') { 
+    } 
+    
+    if (currentFilter === 'reactivos') { 
         dynamicDateCol = '<th>PRÓXIMO CONTACTO</th>';
     } else if (currentFilter === 'agendados') { 
         dynamicDateCol = '<th>FECHA CITA</th>';
-        if (adminMode) extraHeaders = '<th>RETORNO</th>'; // Solo el Admin (0520) ve Retorno
+        if (adminMode) extraHeaders += '<th>RETORNO</th>'; 
     } else if (currentFilter === 'efectivas') { 
         dynamicDateCol = '<th style="color:#34c759;">SERVICIO REALIZADO</th>'; 
         statusHeader = '<th style="color:#34c759;">FECHA FACTURA</th>'; 
-        actionHeader = ''; // Nadie puede gestionar efectivas
+        actionHeader = ''; 
     } else if (currentFilter === 'perdidos') { 
         dynamicDateCol = '<th>MOTIVO PÉRDIDA</th>'; 
-        if (!adminMode) actionHeader = ''; // Operadoras no ven el botón de rescatar perdidos
+        if (!adminMode) actionHeader = ''; 
     }
     
     thead.innerHTML = `<tr><th>ORDEN / VIN</th><th>CLIENTE</th><th>TELÉFONO</th>${extraHeaders}<th>ÚLTIMO SERVICIO</th>${dynamicDateCol}${statusHeader}${actionHeader}</tr>`;
@@ -363,7 +448,6 @@ function renderTable() {
         else if (d.agendo === 'SI') statusTag = '<span class="status-dot st-agendado"></span>Agendado';
         else statusTag = '<span class="status-dot st-reactivo"></span>Por Contactar';
 
-        // ACCIONES GLOBALES
         let tdAction = '';
         if (actionHeader !== '') {
             let actionButtons = `<button class="btn-action-clean" onclick="window.openModal(${realIndex})">Gestionar</button>`;
@@ -379,7 +463,7 @@ function renderTable() {
             fechaColHtml = nextCont.isOverdue ? `<span style="color:#ff3b30; font-weight:600;">${nextCont.text} (Atrasado)</span>` : `<span style="color:#86868b;">${nextCont.text}</span>`;
         } else if (currentFilter === 'agendados') {
             if (d.fecha_cita) { 
-                const parts = d.fecha_cita.split('-'); // 2026-11-20 -> [2026, 11, 20]
+                const parts = d.fecha_cita.split('-'); 
                 if(parts.length === 3) fechaColHtml = `<span style="color:#1d1d1f; font-weight:600;">${parts[2]}/${parts[1]}/${parts[0]}</span>`;
                 else fechaColHtml = `<span style="color:#1d1d1f; font-weight:600;">${d.fecha_cita}</span>`; 
             }
@@ -387,17 +471,20 @@ function renderTable() {
             fechaColHtml = `<span style="color:#34c759; font-weight:700; font-size:11px;">${d.servicio_realizado || 'Mantenimiento Confirmado'}</span>`; 
         } else if (currentFilter === 'perdidos') { fechaColHtml = `<span style="color:#86868b;">${d.motivo_pausa || 'Sin motivo'}</span>`; }
 
-        // COLUMNAS EXTRA Y DE RETORNO
         let extraTd = '';
-        if (currentFilter === 'proactivos') {
+        if (activeTab === 'primer' && currentFilter !== 'efectivas' && currentFilter !== 'perdidos') {
+            let nV = d.vendedor || 'N/A';
+            extraTd = `<td><span style="color:#5e5ce6; font-weight:600; font-size:10px;">${nV}</span></td>`;
+        } else if (currentFilter === 'proactivos') {
             let nA = d.asesor_proactivo || 'N/A';
             if (nA.toUpperCase().includes('JARED')) nA = 'Jared'; else if (nA.toUpperCase().includes('EUGENIA')) nA = 'Eugenia';
             extraTd = `<td><span style="color:#5e5ce6; font-weight:600;">${nA}</span></td>`;
-        } else if (currentFilter === 'agendados' && adminMode) {
-            extraTd = `<td><button class="btn-corp-outline" style="font-size:10px; padding:4px 8px; color:#ff9f0a; border-color:#ff9f0a;" onclick="window.returnToReactivo(${realIndex})">↺ Retornar</button></td>`;
+        } 
+        
+        if (currentFilter === 'agendados' && adminMode) {
+            extraTd += `<td><button class="btn-corp-outline" style="font-size:10px; padding:4px 8px; color:#ff9f0a; border-color:#ff9f0a;" onclick="window.returnToReactivo(${realIndex})">↺ Retornar</button></td>`;
         }
 
-        // STATUS O FECHA DE FACTURA
         let statusTagOrDate = statusTag;
         if (currentFilter === 'efectivas') {
             statusTagOrDate = `<span style="font-weight:700; color:var(--apple-text);">${d.fecha_factura_efectiva || 'Sin Fecha'}</span>`;
@@ -438,7 +525,7 @@ window.returnToReactivo = async function(realIndex) {
         await updateDoc(doc(db, "clientes", client.firebaseId), { 
             agendo: 'NO', 
             contactado: 'PENDIENTE',
-            fecha_cita: null // Se borra la fecha para que inicie limpio
+            fecha_cita: null
         }); 
         await syncWithFirebase(); 
         alert("Cliente retornado a Reactivos exitosamente.");

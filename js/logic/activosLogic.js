@@ -214,21 +214,25 @@ export async function crossReferenceServicesActivos(files, currentDatabase) {
 
 
 // ---------------------------------------------------------
-// SECCIÓN 4: CITAS EFECTIVAS POR VIN (TRIÁNGULO DE DATOS - Opción 4)
+// SECCIÓN 4: CITAS EFECTIVAS POR VIN (15 DÍAS DE CORTE)
 // ---------------------------------------------------------
-export async function markEffectiveAppointments(fileFacturas, fileAsesores, currentDatabase) {
+export async function markEffectiveAppointments(fileFacturas, fileAsesores, currentDatabase, mesTrabajo) {
     return new Promise(async (resolve, reject) => {
         try {
+            // Lógica matemática del corte: Día 15 del mes ANTERIOR al seleccionado
+            const [yearStr, monthStr] = mesTrabajo.split('-');
+            // Restamos 2: JS maneja meses de 0 a 11. Restamos 1 para el mes actual, y 1 más para el mes pasado.
+            const fechaCorteProactivo = new Date(parseInt(yearStr), parseInt(monthStr) - 2, 15);
+
             const dataFacturas = await readFileAsArrayBuffer(fileFacturas);
             const wbFacturas = XLSX.read(dataFacturas, { type: 'array' });
             const rawFacturas = XLSX.utils.sheet_to_json(wbFacturas.Sheets[wbFacturas.SheetNames[0]], { defval: "" });
 
-            // Ahora guardamos el VIN y la FECHA de la factura
             const mapFacturaData = {};
             rawFacturas.forEach(row => {
                 const factura = String(row['Factura'] || '').trim().toUpperCase();
                 const vin = String(row['No. SERIE'] || row['VIN'] || '').trim().toUpperCase();
-                const fechaFac = String(row['FECHA'] || '').trim(); // Extraemos la fecha
+                const fechaFac = String(row['FECHA'] || '').trim();
                 if (factura && vin) mapFacturaData[factura] = { vin: vin, fechaFac: fechaFac };
             });
 
@@ -267,12 +271,29 @@ export async function markEffectiveAppointments(fileFacturas, fileAsesores, curr
                         } else { if(maxKms === -1) mejorServicio = desc; }
                     });
                     
-                    // Empujamos la fecha real de la factura
+                    // Convertir la fecha de la factura para comparar con el corte de los 15 días
+                    let fechaComparacion = null;
+                    const fStr = dataServicio.fecha_factura;
+                    if (fStr && fStr.includes('/')) {
+                        const p = fStr.split('/');
+                        fechaComparacion = new Date(p[2], p[1]-1, p[0]);
+                    } else if (!isNaN(fStr)) {
+                        fechaComparacion = new Date(Math.round((fStr - 25569)*86400*1000));
+                    }
+
+                    // Motor de Decisión: Proactivo o Efectiva
+                    let estatusFinal = 'CITA_EFECTIVA';
+                    if (fechaComparacion && fechaComparacion <= fechaCorteProactivo) {
+                        estatusFinal = 'PROACTIVO';
+                    }
+
+                    let fechaPrint = fechaComparacion ? `${String(fechaComparacion.getDate()).padStart(2,'0')}/${String(fechaComparacion.getMonth()+1).padStart(2,'0')}/${fechaComparacion.getFullYear()}` : fStr;
+
                     verifiedRecords.push({
                         firebaseId: client.firebaseId,
                         servicio_realizado: mejorServicio, 
-                        fecha_factura_efectiva: dataServicio.fecha_factura,
-                        contactado: 'CITA_EFECTIVA'
+                        fecha_factura_efectiva: fechaPrint,
+                        contactado: estatusFinal
                     });
                 }
             });
