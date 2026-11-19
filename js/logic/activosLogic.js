@@ -3,7 +3,6 @@
 // OBJETIVO: Motores de procesamiento Excel para la Base Inteligente
 // =====================================================================
 
-// Utilidad interna para leer archivos de forma segura
 const readFileAsArrayBuffer = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => resolve(new Uint8Array(e.target.result));
@@ -11,9 +10,34 @@ const readFileAsArrayBuffer = (file) => new Promise((resolve, reject) => {
     reader.readAsArrayBuffer(file);
 });
 
-// ---------------------------------------------------------
-// SECCIÓN 1: PROCESAMIENTO DE LA BASE INICIAL (Opción 1)
-// ---------------------------------------------------------
+function parseExcelDate(val) {
+    if (!val) return null;
+    const str = String(val).trim();
+    if (!str || str === "undefined") return null;
+
+    if (str.includes('/')) {
+        const p = str.split('/');
+        if (p.length === 3) {
+            const d = parseInt(p[0], 10);
+            const m = parseInt(p[1], 10) - 1;
+            const y = p[2].length === 2 ? parseInt("20" + p[2], 10) : parseInt(p[2], 10);
+            if (!isNaN(d) && !isNaN(m) && !isNaN(y)) return new Date(y, m, d);
+        }
+    }
+    if (!isNaN(str) && Number(str) > 20000) {
+        return new Date(Math.round((Number(str) - 25569) * 86400 * 1000));
+    }
+    return null;
+}
+
+function formatDateDDMMYYYY(dateObj) {
+    if (!dateObj || isNaN(dateObj.getTime())) return "Sin Fecha";
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${dateObj.getFullYear()}`;
+}
+
+//#region SECCIÓN 1: PROCESAMIENTO DE LA BASE INICIAL (Opción 1)
 export async function processMainBaseActivos(file, targetTab, mesTrabajo) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -22,65 +46,80 @@ export async function processMainBaseActivos(file, targetTab, mesTrabajo) {
             const sheetName = workbook.SheetNames[0];
             const rawData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { raw: false, defval: "" });
 
-            let newRecords = [];
             let discardedRecords = [];
-            
-            // Calculamos la fecha límite (Hace 6 meses)
-            const [year, month] = mesTrabajo.split('-');
-            const targetDate = new Date(year, month - 1, 1);
-            targetDate.setMonth(targetDate.getMonth() - 6);
-            
-            const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-            const targetMonthName = monthNames[targetDate.getMonth()].toLowerCase();
-            const targetYearStr = String(targetDate.getFullYear()).slice(-2);
 
+            // Calculamos el mes objetivo exacto (6 meses antes de mesTrabajo)
+            // Ej: mesTrabajo = "2026-12" -> Junio 2026
+            const [yearStr, monthStr] = mesTrabajo.split('-');
+            const targetDate = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10) - 1, 1);
+            targetDate.setMonth(targetDate.getMonth() - 6);
+
+            const targetYear = targetDate.getFullYear();
+            const targetMonth = targetDate.getMonth();
+            const endOfTargetMonth = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
+
+            const baseObjetivoPorVin = new Map();
+            const retornosPosterioresPorVin = new Map();
+
+            // PASADA 1: Separar Mes Objetivo (hace 6 meses) vs Retornos Posteriores
             rawData.forEach((row, index) => {
                 const orden = String(row['NO. ORDEN'] || row['ORDEN'] || '').trim();
                 const cliente = String(row['CLIENTE'] || '').trim();
-                const fechaFactura = String(row['FECHA'] || row['FECHA FACTURA'] || '').trim();
-                
+                const vin = String(row['No. SERIE'] || row['VIN'] || '').trim().toUpperCase();
+                const fechaRaw = row['FECHA'] || row['FECHA FACTURA'] || '';
+
                 if (!orden || orden.toLowerCase().includes('totales') || !cliente) {
-                    discardedRecords.push(`Fila ${index + 2}: Ignorada (Orden o Cliente vacío / Totales)`);
+                    discardedRecords.push(`Fila ${index + 2}: Ignorada (Orden/Cliente vacío o Totales)`);
                     return;
                 }
 
-                // Determinar si es Proactivo (ya facturó recientemente)
-                let esProactivo = false;
-                let fechaProactivo = "";
-                let ordenProactivo = "";
-                let servicioProactivo = "";
-                let asesorProactivo = "";
-
-                if (fechaFactura) {
-                    const monthMatch = fechaFactura.match(/([a-zA-Z]{3})\s*(\d{2})/i);
-                    let rowMonth = "", rowYear = "";
-                    if (monthMatch) { rowMonth = monthMatch[1].toLowerCase(); rowYear = monthMatch[2]; } 
-                    else {
-                        const parts = fechaFactura.split('/');
-                        if (parts.length === 3) {
-                            const mIndex = parseInt(parts[1]) - 1;
-                            if (mIndex >= 0 && mIndex <= 11) { rowMonth = monthNames[mIndex].toLowerCase(); rowYear = parts[2].slice(-2); }
-                        }
-                    }
-
-                    if (rowMonth && rowYear) {
-                        if (rowYear > targetYearStr || (rowYear === targetYearStr && monthNames.findIndex(m => m.toLowerCase() === rowMonth) > targetDate.getMonth())) {
-                            esProactivo = true;
-                            fechaProactivo = fechaFactura;
-                            ordenProactivo = orden;
-                            servicioProactivo = "Facturó Adelantado";
-                            asesorProactivo = row['ASESOR'] || "N/A";
-                        }
-                    }
+                const dateObj = parseExcelDate(fechaRaw);
+                if (!dateObj) {
+                    discardedRecords.push(`Fila ${index + 2}: Ignorada (Fecha inválida: "${fechaRaw}")`);
+                    return;
                 }
 
+                // A) Solo filas del mes objetivo (ej. Junio 2026)
+                if (dateObj.getFullYear() === targetYear && dateObj.getMonth() === targetMonth) {
+                    const key = vin || `SIN_VIN_${orden}`;
+                    const prev = baseObjetivoPorVin.get(key);
+                    if (!prev || dateObj >= prev.dateObj) {
+                        baseObjetivoPorVin.set(key, { row, orden, cliente, vin: vin || 'N/D', dateObj });
+                    }
+                }
+                // B) Facturas posteriores (ej. Julio-Nov 2026) para detectar Proactivos
+                else if (dateObj > endOfTargetMonth && vin) {
+                    const prevRet = retornosPosterioresPorVin.get(vin);
+                    if (!prevRet || dateObj >= prevRet.dateObj) {
+                        retornosPosterioresPorVin.set(vin, {
+                            dateObj,
+                            fechaStr: formatDateDDMMYYYY(dateObj),
+                            orden,
+                            asesor: String(row['ASESOR'] || 'N/A').trim()
+                        });
+                    }
+                }
+            });
+
+            // PASADA 2: Armar registros finales con fecha +6 meses (segura en fin de mes) y cruce Proactivo
+            let newRecords = [];
+            baseObjetivoPorVin.forEach(({ row, orden, cliente, vin, dateObj }) => {
+                const retorno = vin !== 'N/D' ? retornosPosterioresPorVin.get(vin) : null;
+                const esProactivo = Boolean(retorno);
+
+                const targetMonthLastDay = new Date(dateObj.getFullYear(), dateObj.getMonth() + 7, 0).getDate();
+                const safeDay = Math.min(dateObj.getDate(), targetMonthLastDay);
+                const proxDate = new Date(dateObj.getFullYear(), dateObj.getMonth() + 6, safeDay);
+                const proxServicioStr = formatDateDDMMYYYY(proxDate);
+
                 const newClient = {
-                    orden: esProactivo ? "" : orden,
-                    vin: String(row['No. SERIE'] || row['VIN'] || 'N/D').trim(),
+                    orden: orden,
+                    vin: vin,
                     cliente: cliente,
                     telefono: "Pendiente",
                     ultimo_servicio: "Por verificar",
-                    proximo_servicio: esProactivo ? "" : (row['FECHA'] || "Sin Fecha"),
+                    fecha_ultima_factura: formatDateDDMMYYYY(dateObj),
+                    proximo_servicio: proxServicioStr,
                     contactado: esProactivo ? "PROACTIVO" : "PENDIENTE",
                     agendo: "NO",
                     paso_actual: 0,
@@ -92,11 +131,12 @@ export async function processMainBaseActivos(file, targetTab, mesTrabajo) {
                 };
 
                 if (esProactivo) {
-                    newClient.fecha_proactivo = fechaProactivo;
-                    newClient.orden_proactivo = ordenProactivo;
-                    newClient.servicio_proactivo = servicioProactivo;
-                    newClient.asesor_proactivo = asesorProactivo;
+                    newClient.fecha_proactivo = retorno.fechaStr;
+                    newClient.orden_proactivo = retorno.orden;
+                    newClient.servicio_proactivo = "Facturó Adelantado";
+                    newClient.asesor_proactivo = retorno.asesor;
                 }
+
                 newRecords.push(newClient);
             });
 
@@ -104,11 +144,9 @@ export async function processMainBaseActivos(file, targetTab, mesTrabajo) {
         } catch (error) { reject(error); }
     });
 }
+//#endregion
 
-
-// ---------------------------------------------------------
-// SECCIÓN 2: DIRECTORIO TELEFÓNICO E IMPORTES (Opción 2)
-// ---------------------------------------------------------
+//#region SECCIÓN 2: DIRECTORIO TELEFÓNICO E IMPORTES (Opción 2)
 export async function enrichClientDataActivos(file, currentDatabase) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -149,11 +187,9 @@ export async function enrichClientDataActivos(file, currentDatabase) {
         } catch (error) { reject(error); }
     });
 }
+//#endregion
 
-
-// ---------------------------------------------------------
-// SECCIÓN 3: AUDITORÍA DE CALIDAD / KMs / CORTESÍAS (Opción 3)
-// ---------------------------------------------------------
+//#region SECCIÓN 3: AUDITORÍA DE CALIDAD / KMs / CORTESÍAS (Opción 3)
 export async function crossReferenceServicesActivos(files, currentDatabase) {
     return new Promise(async (resolve, reject) => {
         try {
@@ -201,7 +237,6 @@ export async function crossReferenceServicesActivos(files, currentDatabase) {
                         client.ultimo_servicio = mejorServicio; 
                         verified.push(client);
                     } else {
-                        // Si no hay mantenimiento, se va a papelera (Cortesía, Pintura, etc)
                         client.motivos_eliminacion = dataTaller.lineas.map(l => `${l.clasificacion}: ${l.descripcion}`).join(' | ');
                         pendingPurge.push(client);
                     }
@@ -211,17 +246,13 @@ export async function crossReferenceServicesActivos(files, currentDatabase) {
         } catch (error) { reject(error); }
     });
 }
+//#endregion
 
-
-// ---------------------------------------------------------
-// SECCIÓN 4: CITAS EFECTIVAS POR VIN (15 DÍAS DE CORTE)
-// ---------------------------------------------------------
+//#region SECCIÓN 4: CITAS EFECTIVAS POR VIN (15 DÍAS DE CORTE)
 export async function markEffectiveAppointments(fileFacturas, fileAsesores, currentDatabase, mesTrabajo) {
     return new Promise(async (resolve, reject) => {
         try {
-            // Lógica matemática del corte: Día 15 del mes ANTERIOR al seleccionado
             const [yearStr, monthStr] = mesTrabajo.split('-');
-            // Restamos 2: JS maneja meses de 0 a 11. Restamos 1 para el mes actual, y 1 más para el mes pasado.
             const fechaCorteProactivo = new Date(parseInt(yearStr), parseInt(monthStr) - 2, 15);
 
             const dataFacturas = await readFileAsArrayBuffer(fileFacturas);
@@ -271,23 +302,14 @@ export async function markEffectiveAppointments(fileFacturas, fileAsesores, curr
                         } else { if(maxKms === -1) mejorServicio = desc; }
                     });
                     
-                    // Convertir la fecha de la factura para comparar con el corte de los 15 días
-                    let fechaComparacion = null;
-                    const fStr = dataServicio.fecha_factura;
-                    if (fStr && fStr.includes('/')) {
-                        const p = fStr.split('/');
-                        fechaComparacion = new Date(p[2], p[1]-1, p[0]);
-                    } else if (!isNaN(fStr)) {
-                        fechaComparacion = new Date(Math.round((fStr - 25569)*86400*1000));
-                    }
+                    const fechaComparacion = parseExcelDate(dataServicio.fecha_factura);
 
-                    // Motor de Decisión: Proactivo o Efectiva
                     let estatusFinal = 'CITA_EFECTIVA';
                     if (fechaComparacion && fechaComparacion <= fechaCorteProactivo) {
                         estatusFinal = 'PROACTIVO';
                     }
 
-                    let fechaPrint = fechaComparacion ? `${String(fechaComparacion.getDate()).padStart(2,'0')}/${String(fechaComparacion.getMonth()+1).padStart(2,'0')}/${fechaComparacion.getFullYear()}` : fStr;
+                    let fechaPrint = fechaComparacion ? formatDateDDMMYYYY(fechaComparacion) : dataServicio.fecha_factura;
 
                     verifiedRecords.push({
                         firebaseId: client.firebaseId,
@@ -302,3 +324,4 @@ export async function markEffectiveAppointments(fileFacturas, fileAsesores, curr
         } catch (error) { reject(error); }
     });
 }
+//#endregion 

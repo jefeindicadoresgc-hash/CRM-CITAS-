@@ -1,8 +1,5 @@
 <!DOCTYPE html>
 <html lang="es">
-
-<!-- #region etapa 1 -->
-
 <head>
     <!-- ==========================================
          ETAPA 1: HEAD Y LIBRERÍAS
@@ -10,253 +7,236 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CRM Retención | Hyundai</title>
-    <!-- Fuentes Corporativas -->
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <!-- Fuentes Corporativas y Editorial -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+    
     <!-- Librerías Externas -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-
+    
     <!-- Estilos Principales -->
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=2.8">
 </head>
-
 <body>
-    <!-- #endregion -->
 
-    <!-- #region etapa2  -->
     <!-- ==========================================
-         ETAPA 2: LOGIN RETRO (POKÉMON)
+         ETAPA 2: LOGIN EDITORIAL FILOSÓFICO
          ========================================== -->
-    <div id="login-screen" class="screen active retro-bg">
-        <div id="rain-container"></div>
-        <div class="pokedex-container glass-pokedex">
-            <div class="screen-header">
-                <div class="blue-light"></div>
-                <div class="small-lights">
-                    <div class="red-light"></div>
-                    <div class="yellow-light"></div>
-                    <div class="green-light"></div>
-                </div>
+    <div id="login-screen" class="screen active login-editorial-bg">
+        <div class="login-card">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Hyundai_Motor_Company_logo.svg" alt="Hyundai" class="login-logo">
+            <p class="login-eyebrow">ACCESO AL SISTEMA</p>
+
+            <div id="captcha-section" class="philo-box">
+                <p id="philo-quote" class="philo-quote"></p>
+                <p id="philo-author" class="philo-author"></p>
+                <div id="philo-options" class="philo-options"></div>
+                <p id="philo-feedback" class="philo-feedback"></p>
             </div>
 
-            <div class="pokedex-screen">
-                <div class="title-container">
-                    <h2 class="typewriter-title">POKE CITAS</h2>
-                    <h3 class="typewriter-subtitle">HYUNDAI COATZA</h3>
-                </div>
-
-                <div id="captcha-section" class="captcha-box">
-                    <div id="power-on-screen">
-                        <button id="btn-power-on" class="poke-btn">ENCENDER POKÉDEX</button>
-                    </div>
-                    <div id="game-screen" class="hidden">
-                        <p class="captcha-title">¿QUIÉN ES ESTE POKÉMON?</p>
-                        <img id="captcha-img" src="" class="silhouette" alt="Misterio">
-                        <p id="captcha-hint" class="hint-text">Cargando pista...</p>
-                        <div id="captcha-buttons" class="btn-grid"></div>
-                    </div>
-                </div>
-
-                <div id="password-section" class="hidden">
-                    <p style="font-size: 10px; color: #008000; margin-bottom: 10px; font-weight: bold;">¡Desbloqueado!
-                    </p>
-                    <div class="input-group">
-                        <input type="password" id="password" placeholder="CÓDIGO (ENTER)">
-                    </div>
-                </div>
+            <div id="password-section" class="hidden login-pass-box">
+                <input type="password" id="password" class="login-pass-input" placeholder="Ingresa tu clave de acceso">
+                <button type="button" id="btn-login-submit" class="login-submit-btn">Entrar</button>
             </div>
         </div>
     </div>
-    <!-- #endregion -->
 
-    <!-- #region etapa 3 -->
     <!-- ==========================================
          ETAPA 3: NAVEGACIÓN SUPERIOR Y PESTAÑAS
          ========================================== -->
     <div id="main-screen" class="screen hidden modern-bg">
-
-        <!-- Navbar Corporativa (CORREGIDA Y ALINEADA) -->
-        <nav class="solid-navbar"
-            style="display: flex; justify-content: space-between; align-items: center; padding: 12px 24px; background: #ffffff; border-bottom: 1px solid #e9ecef; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+        
+        <!-- Navbar Corporativa Flotante -->
+        <nav class="solid-navbar" style="display: flex; justify-content: space-between; align-items: center;">
             <div class="nav-brand" style="display: flex; align-items: center;">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Hyundai_Motor_Company_logo.svg"
-                    alt="Hyundai Logo" style="height: 28px; width: auto; object-fit: contain; margin-right: 12px;">
-                <span class="nav-title"
-                    style="font-weight: 700; font-size: 18px; color: #1d1d1f; padding-left: 12px; border-left: 2px solid #e9ecef;">CRM
-                    Corporativo</span>
+                <img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Hyundai_Motor_Company_logo.svg" alt="Hyundai Logo" style="height: 24px; width: auto; object-fit: contain;">
             </div>
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <label style="color: var(--apple-text); font-size: 12px; font-weight: 600;">Mes Operativo:</label>
-                <input type="month" id="mes-filtro" class="table-input"
-                    style="width: auto; font-weight: bold; background: transparent; border: 1px solid #d2d2d7;">
-                <button id="btn-clear-data" class="btn-corp-outline"
-                    style="color:#e3342f; border-color:#e3342f; padding: 6px 12px;">Limpiar Nube</button>
-                <button id="btn-logout" class="btn-corp-outline" style="padding: 6px 12px;">Cerrar Sesión</button>
+
+            <!-- SWITCH MODO ALL (CENTRADO) -->
+            <div class="mode-all-wrapper">
+                <span class="mode-all-label">MODO ALL</span>
+                <div class="toggler">
+                    <input id="mode-all-toggle" name="mode-all-toggle" type="checkbox" value="1">
+                    <label for="mode-all-toggle">
+                        <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                            <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
+                        </svg>
+                        <svg class="toggler-off" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                            <line class="path line" x1="34.4" y1="34.4" x2="95.8" y2="95.8"></line>
+                            <line class="path line" x1="95.8" y1="34.4" x2="34.4" y2="95.8"></line>
+                        </svg>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Controles Derecha (Selector de Mes + Puerta de Salida) -->
+            <div class="nav-actions">
+                <input type="month" id="mes-filtro" class="hidden">
+
+                <div id="custom-month-wrapper" class="custom-month-wrapper">
+                    <button type="button" id="month-picker-btn" class="month-pill-btn">
+                        <span id="month-picker-label">Nov 2026</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <div id="month-picker-popover" class="month-popover hidden">
+                        <div class="month-popover-header">
+                            <button type="button" id="mp-prev-year" class="mp-year-btn">&lsaquo;</button>
+                            <span id="mp-year-display">2026</span>
+                            <button type="button" id="mp-next-year" class="mp-year-btn">&rsaquo;</button>
+                        </div>
+                        <div id="mp-months-grid" class="month-popover-grid"></div>
+                    </div>
+                </div>
+
+                <span id="all-months-badge" class="all-months-pill hidden"></span>
+
+                <div class="nav-divider"></div>
+
+                <!-- Botón Puerta Animada para Cerrar Sesión -->
+                <button id="btn-logout" class="door-logout-btn" title="Cerrar Sesión">
+                    <span class="door-frame">
+                        <span class="door-leaf">
+                            <span class="door-knob"></span>
+                        </span>
+                    </span>
+                </button>
             </div>
         </nav>
 
         <main class="dashboard-container">
-            <!-- Pestañas Principales (NUEVA PESTAÑA REZAGADOS) -->
+            <!-- Pestañas Principales (Papelera oculta por defecto, solo Admin) -->
             <div class="tabs-container">
                 <button class="tab-btn active" data-target="activos">Base Activos</button>
                 <button class="tab-btn" data-target="inactivos">Base Inactivos</button>
                 <button class="tab-btn" data-target="primer">Primer Servicio</button>
-                <button class="tab-btn" data-target="rezagados" style="color: #ff9f0a; font-weight: bold;">Base
-                    Rezagados</button>
-                <button class="tab-btn" data-target="papelera"
-                    style="margin-left: auto; color: #ff3b30;">Papelera</button>
+                <button class="tab-btn" data-target="rezagados">Base Rezagados</button>
+                <button id="tab-papelera" class="tab-btn hidden" data-target="papelera" style="margin-left: auto;">Papelera</button>
             </div>
-            <!-- #endregion -->
 
-            <!-- #region etapa 4 -->
             <!-- ==========================================
-                 ETAPA 4: PANEL DE ADMINISTRACIÓN (DISEÑO UNIFORME)
+                 ETAPA 4: PANEL DE ADMINISTRACIÓN (MINIMALISTA)
                  ========================================== -->
-            <div class="glass-card upload-section hidden" id="upload-panel"
-                style="border: 2px dashed #0071e3; background: #f8f9fa;">
-                <h3 style="color: #0071e3; margin-bottom: 15px; font-weight: 800;">🔒 Panel de Administración Avanzada
-                </h3>
-
-                <div id="panel-activos"
-                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; align-items: stretch;">
-
-                    <!-- Opción 1: Subir Base Inicial -->
-                    <div
-                        style="background: #ffffff; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box;">
-                        <div>
-                            <h3 id="title-upload-base" style="font-size: 14px; color: #0071e3; margin-bottom: 5px;">1.
-                                Subir Base (Clave 2099)</h3>
-                            <p id="desc-upload-base" style="font-size: 11px; color:#666; margin-bottom: 12px;">(Filtra a
-                                6 meses y detecta Proactivos)</p>
+            <div class="glass-card upload-section hidden" id="upload-panel">
+                <div class="admin-panel-header">
+                    <div>
+                        <h3 class="admin-panel-title">Administración de Bases</h3>
+                    </div>
+                    <div class="admin-month-box">
+                        <span class="admin-month-label">Mes destino</span>
+                        <input type="month" id="upload-mes" class="admin-month-input">
+                    </div>
+                </div>
+                
+                <div id="panel-activos" class="admin-grid">
+                    <!-- 01: Carga de base -->
+                    <div class="admin-card">
+                        <div class="admin-card-top">
+                            <span class="admin-step">01</span>
+                            <h3 id="title-upload-base">Carga de base</h3>
+                            <p id="desc-upload-base">Filtra a 6 meses y detecta proactivos</p>
                         </div>
-                        <div style="margin-top: auto;">
-                            <div style="margin-bottom: 8px;">
-                                <label
-                                    style="font-size: 11px; font-weight: bold; display: block; margin-bottom: 3px;">Mes
-                                    a trabajar:</label>
-                                <input type="month" id="upload-mes" class="table-input"
-                                    style="width: 100%; border: 2px solid #0071e3; padding: 5px; border-radius: 5px;">
-                            </div>
-                            <input type="file" id="excel-upload" accept=".xls,.xlsx"
-                                style="width: 100%; margin-bottom: 5px; font-size: 11px;">
-                            <button id="btn-process-excel" class="btn-corp-primary" style="width: 100%;">Procesar
-                                Base</button>
+                        <div class="admin-card-actions">
+                            <label class="file-drop-btn" for="excel-upload">
+                                <span class="file-label-text">+ Adjuntar Excel</span>
+                            </label>
+                            <input type="file" id="excel-upload" class="custom-file-input" accept=".xls,.xlsx">
+                            <button id="btn-process-excel" class="btn-corp-primary">Procesar</button>
+                        </div>
+                    </div>
+                    
+                    <!-- 02: Directorio -->
+                    <div id="panel-opcion-2" class="admin-card">
+                        <div class="admin-card-top">
+                            <span class="admin-step">02</span>
+                            <h3>Directorio</h3>
+                            <p>Extrae celulares e importes de otras órdenes</p>
+                        </div>
+                        <div class="admin-card-actions">
+                            <label class="file-drop-btn" for="excel-telefonos">
+                                <span class="file-label-text">+ Adjuntar Excel</span>
+                            </label>
+                            <input type="file" id="excel-telefonos" class="custom-file-input" accept=".xls,.xlsx">
+                            <button id="btn-process-telefonos" class="btn-corp-primary">Extraer</button>
                         </div>
                     </div>
 
-                    <!-- Opción 2: Minería Telefónica -->
-                    <div id="panel-opcion-2"
-                        style="background: #ffffff; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box;">
-                        <div>
-                            <h3 style="font-size: 14px; color: #ff9f0a; margin-bottom: 5px;">2. Directorio Telefónico
-                            </h3>
-                            <p style="font-size: 11px; color:#666; margin-bottom: 12px;">(Cruzar "otras ordenes.xls"
-                                para celulares e importes)</p>
+                    <!-- 03: Separación de proactivo -->
+                    <div id="panel-opcion-3" class="admin-card">
+                        <div class="admin-card-top">
+                            <span class="admin-step">03</span>
+                            <h3>Separación de proactivo</h3>
+                            <p>Limpia cortesías y actualiza kilometrajes</p>
                         </div>
-                        <div style="margin-top: auto;">
-                            <input type="file" id="excel-telefonos" accept=".xls,.xlsx"
-                                style="width: 100%; margin-bottom: 5px; font-size: 11px;">
-                            <button id="btn-process-telefonos" class="btn-corp-primary"
-                                style="background:#ff9f0a; width: 100%;">Extraer Teléfonos</button>
-                        </div>
-                    </div>
-
-                    <!-- Opción 3: Filtro Asesores / Cortesía -->
-                    <div id="panel-opcion-3"
-                        style="background: #fff5f5; padding: 15px; border-radius: 8px; border: 1px solid #f8d7da; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box;">
-                        <div>
-                            <h3 style="font-size: 14px; color: #ff3b30; margin-bottom: 5px;">3. Auditoría de Calidad
-                            </h3>
-                            <p style="font-size: 11px; color:#666; margin-bottom: 12px;">(Limpieza de cortesías y
-                                actualización de KMs)</p>
-                        </div>
-                        <div style="margin-top: auto;">
-                            <input type="file" id="excel-asesores" accept=".xls,.xlsx" multiple
-                                style="width: 100%; margin-bottom: 5px; font-size: 11px;">
-                            <button id="btn-process-asesores" class="btn-corp-danger" style="width: 100%;">Vincular y
-                                Filtrar</button>
+                        <div class="admin-card-actions">
+                            <label class="file-drop-btn" for="excel-asesores">
+                                <span class="file-label-text">+ Adjuntar Reportes</span>
+                            </label>
+                            <input type="file" id="excel-asesores" class="custom-file-input" accept=".xls,.xlsx" multiple>
+                            <button id="btn-process-asesores" class="btn-corp-danger">Filtrar</button>
                         </div>
                     </div>
 
-                    <!-- Opción 4: Citas Efectivas (TRIÁNGULO DE DATOS) -->
-                    <div id="panel-opcion-4"
-                        style="background: #f0fdf4; padding: 15px; border-radius: 8px; border: 1px solid #bbf7d0; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box;">
-                        <div>
-                            <h3 style="font-size: 14px; color: #34c759; margin-bottom: 5px;">4. Cargar Citas Efectivas
-                            </h3>
-                            <p style="font-size: 11px; color:#666; margin-bottom: 5px;">1. Reporte Facturado (Con VIN)
-                            </p>
-                            <input type="file" id="excel-facturas" accept=".xls,.xlsx"
-                                style="width: 100%; margin-bottom: 8px; font-size: 11px;" title="Sube el archivo 4.0">
-                            <p style="font-size: 11px; color:#666; margin-bottom: 5px;">2. Reporte Asesores
-                                (Jared/Eugenia)</p>
+                    <!-- 04: Citas Efectivas -->
+                    <div id="panel-opcion-4" class="admin-card">
+                        <div class="admin-card-top">
+                            <span class="admin-step">04</span>
+                            <h3>Citas Efectivas</h3>
+                            <p>Cruce Facturas y Asesores</p>
                         </div>
-                        <div style="margin-top: auto;">
-                            <input type="file" id="excel-efectivas" accept=".xls,.xlsx"
-                                style="width: 100%; margin-bottom: 5px; font-size: 11px;" title="Sube el archivo 4.1">
-                            <button id="btn-process-efectivas" class="btn-corp-primary"
-                                style="background:#34c759; width: 100%;">Confirmar Asistencias</button>
+                        <div class="admin-card-actions">
+                            <label class="file-drop-btn" for="excel-facturas" title="Reporte Facturado (Con VIN)">
+                                <span class="file-label-text">+ 1. Facturas (VIN)</span>
+                            </label>
+                            <input type="file" id="excel-facturas" class="custom-file-input" accept=".xls,.xlsx">
+
+                            <label class="file-drop-btn" for="excel-efectivas" title="Reporte Asesores">
+                                <span class="file-label-text">+ 2. Asesores</span>
+                            </label>
+                            <input type="file" id="excel-efectivas" class="custom-file-input" accept=".xls,.xlsx">
+
+                            <button id="btn-process-efectivas" class="btn-corp-primary">Confirmar</button>
                         </div>
                     </div>
 
-                    <!-- Opción 5: ZONA DE PELIGRO (Bóveda) -->
-                    <div id="panel-opcion-5"
-                        style="background: #fff0f0; padding: 15px; border-radius: 8px; border: 1px solid #ffcdd2; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box;">
-                        <div>
-                            <h3 style="font-size: 14px; color: #d32f2f; margin-bottom: 5px;">5. Limpiar Base Actual</h3>
-                            <p style="font-size: 11px; color:#666; margin-bottom: 12px;">(Borra SOLO la pestaña y mes
-                                actual de forma segura)</p>
+                    <!-- 05: Limpiar Mes -->
+                    <div id="panel-opcion-5" class="admin-card">
+                        <div class="admin-card-top">
+                            <span class="admin-step">05</span>
+                            <h3>Limpiar Mes</h3>
+                            <p>Respaldo seguro en Bóveda</p>
                         </div>
-                        <div style="margin-top: auto;">
-                            <button id="btn-clear-data-smart" class="btn-corp-danger"
-                                style="width: 100%; background: #d32f2f;">Purgar a Bóveda (2099)</button>
+                        <div class="admin-card-actions">
+                            <button id="btn-clear-data-smart" class="btn-corp-danger">Purgar a Bóveda</button>
                         </div>
                     </div>
                 </div>
-
+                
                 <div id="panel-otros" class="hidden">
-                    <p style="font-size: 13px; text-align: center; color: #666; font-weight: bold;">Selecciona "Base
-                        Activos" para cargar datos.</p>
+                    <p style="font-size: 13px; text-align: center; color: #6b635a;">Selecciona "Base Activos" para cargar datos.</p>
                 </div>
-                <p id="upload-status" class="status-msg"
-                    style="margin-top: 15px; text-align: center; font-weight: bold;"></p>
+                <p id="upload-status" class="status-msg" style="margin-top: 12px; text-align: center; font-weight: 600; font-size: 12px;"></p>
             </div>
-            <!-- #endregion -->
 
-            <!-- #region etapa 5 -->
             <!-- ==========================================
                  ETAPA 5: TARJETAS DE INDICADORES DIRECTIVOS (KPIs)
                  ========================================== -->
             <div class="glass-card table-section">
-                <!-- Tarjetas Superiores -->
-                <div id="stats-panel"
-                    style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 25px;">
-                    <div class="stat-card"><strong>TOTAL ASIGNADOS:</strong> <span id="stat-total"
-                            style="color: var(--apple-text);">0</span></div>
-                    <div class="stat-card"><strong>PENDIENTES DE CITA:</strong> <span id="stat-reactivos"
-                            style="color: #ff9f0a;">0</span></div>
-                    <div class="stat-card"><strong>CITADOS PENDIENTES:</strong> <span id="stat-agendados"
-                            style="color: #32ade6;">0</span></div>
-                    <div class="stat-card"><strong>CITAS EFECTIVAS:</strong> <span id="stat-efectivas"
-                            style="color: #34c759;">0</span></div>
-                    <div class="stat-card"><strong>PROACTIVOS:</strong> <span id="stat-proactivos"
-                            style="color: #5e5ce6;">0</span></div>
-                    <div class="stat-card"><strong>PERDIDOS:</strong> <span id="stat-perdidos"
-                            style="color: #ff3b30;">0</span></div>
+                <div id="stats-panel" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 25px;">
+                    <div class="stat-card"><strong>TOTAL ASIGNADOS:</strong> <span id="stat-total">0</span></div>
+                    <div class="stat-card"><strong>PENDIENTES DE CITA:</strong> <span id="stat-reactivos">0</span></div>
+                    <div class="stat-card"><strong>CITADOS PENDIENTES:</strong> <span id="stat-agendados">0</span></div>
+                    <div class="stat-card"><strong>CITAS EFECTIVAS:</strong> <span id="stat-efectivas">0</span></div>
+                    <div class="stat-card"><strong>PROACTIVOS:</strong> <span id="stat-proactivos">0</span></div>
+                    <div class="stat-card"><strong>PERDIDOS:</strong> <span id="stat-perdidos">0</span></div>
                 </div>
-                <!-- #endregion -->
 
-                <!-- #region etapa 6 -->
                 <!-- ==========================================
                      ETAPA 6: TABLA PRINCIPAL Y FILTROS DEL EMBUDO
                      ========================================== -->
-                <div class="table-header"
-                    style="display: flex; flex-direction: column; align-items: flex-start; gap: 15px;">
+                <div class="table-header" style="display: flex; flex-direction: column; align-items: flex-start; gap: 15px;">
                     <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
-                        <h3 id="table-title" style="margin:0; font-weight: 700; font-size: 18px;">Directorio de Clientes
-                        </h3>
+                        <h3 id="table-title" style="margin:0; font-weight: 700; font-size: 18px;">Directorio de Clientes</h3>
                         <div id="papelera-filters" class="hidden" style="display:flex; gap: 8px;">
                             <button class="badge-apple btn-pap-sub active" data-sub="activos">Activos</button>
                             <button class="badge-apple btn-pap-sub" data-sub="inactivos">Inactivos</button>
@@ -264,27 +244,23 @@
                             <button class="badge-apple btn-pap-sub" data-sub="rezagados">Rezagados</button>
                         </div>
                     </div>
-
-                    <!-- Botones de Pipeline -->
-                    <div id="view-filters" class="filters-container"
-                        style="display:flex; gap: 6px; flex-wrap: wrap; width: 100%;">
+                    
+                    <!-- Botones de Pipeline (Formato Título Uniforme) -->
+                    <div id="view-filters" class="filters-container" style="display:flex; gap: 6px; flex-wrap: wrap; width: 100%;">
                         <button id="filter-all" class="badge-apple tab-btn filter-btn active">1. Todos</button>
                         <button id="filter-proactivos" class="badge-apple tab-btn filter-btn">2. Proactivos</button>
-                        <button id="filter-reactivos" class="badge-apple tab-btn filter-btn">3. PENDIENTES DE
-                            CITA</button>
-                        <button id="filter-agendados" class="badge-apple tab-btn filter-btn">4. CITADOS PENDIENTES DE
-                            ASISTIR</button>
+                        <button id="filter-reactivos" class="badge-apple tab-btn filter-btn">3. Pendientes de Cita</button>
+                        <button id="filter-agendados" class="badge-apple tab-btn filter-btn">4. Citados Pendientes de Asistir</button>
                         <button id="filter-efectivas" class="badge-apple tab-btn filter-btn">5. Citas Efectivas</button>
                         <button id="filter-perdidos" class="badge-apple tab-btn filter-btn">6. Perdidos</button>
                     </div>
                 </div>
-
+                
                 <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 14px; font-weight:bold; color:#0071e3;">BUSCAR:</span>
-                    <input type="text" id="search-input" class="table-input"
-                        placeholder="Número de Orden, VIN o Nombre..." style="max-width: 350px;">
+                    <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: #6e655c;">BUSCAR:</span>
+                    <input type="text" id="search-input" class="table-input" placeholder="Número de Orden, VIN o Nombre..." style="max-width: 350px;">
                 </div>
-
+                
                 <div class="table-responsive">
                     <table class="corp-table">
                         <thead></thead>
@@ -294,62 +270,47 @@
             </div>
         </main>
     </div>
-    <!-- #endregion -->
 
-    <!-- #region etapa 7 -->
     <!-- ==========================================
          ETAPA 7: VENTANA MODAL (TIMELINE STRATEGY)
          ========================================== -->
     <div id="client-modal" class="modal hidden">
-        <div class="glass-modal-content" style="max-width: 800px; position: relative; background: #ffffff;">
-            <button id="btn-close-x"
-                style="position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 28px; cursor: pointer; color: #adb5bd; transition: 0.2s;">&times;</button>
-
-            <h2 style="color: #0071e3; border-bottom: 2px solid #f8f9fa; padding-bottom: 10px; font-weight: 700;">
-                Gestión Estratégica</h2>
-            <h3 id="modal-client-name" style="margin: 15px 0 10px 0; font-size: 20px; color: #212529;"></h3>
-
-            <div id="modal-car-info"
-                style="font-size: 13px; color: #495057; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 25px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border: 1px solid #e9ecef;">
+        <div class="glass-modal-content" style="max-width: 800px; position: relative;">
+            <button id="btn-close-x" style="position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 28px; cursor: pointer; transition: 0.2s;">&times;</button>
+            
+            <h2>Gestión Estratégica</h2>
+            <h3 id="modal-client-name"></h3>
+            
+            <div id="modal-car-info" style="margin-bottom: 25px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                 <div><strong>Vehículo:</strong> <span id="modal-auto"></span> (<span id="modal-anio"></span>)</div>
                 <div><strong>VIN:</strong> <span id="modal-vin"></span></div>
-                <div><strong>Teléfono:</strong> <span id="modal-tel" style="font-weight: 700; color: #0071e3;"></span>
-                </div>
+                <div><strong>Teléfono:</strong> <span id="modal-tel"></span></div>
                 <div><strong>Último Costo:</strong> <span id="modal-importe" style="font-weight: 700;"></span></div>
-                <div style="grid-column: span 2;"><strong>Servicio Anterior:</strong> <span id="modal-ult-servicio"
-                        style="color: #6c757d;"></span></div>
+                <div style="grid-column: span 2;"><strong>Servicio Anterior:</strong> <span id="modal-ult-servicio"></span></div>
             </div>
-
+            
             <div class="timeline-wrapper">
-                <div class="timeline-track">
-                    <div id="timeline-fill" class="timeline-track-fill" style="width: 0%;"></div>
-                </div>
+                <div class="timeline-track"><div id="timeline-fill" class="timeline-track-fill" style="width: 0%;"></div></div>
                 <div class="timeline-steps" id="timeline-steps-container"></div>
             </div>
 
-            <div id="dynamic-action-panel"
-                style="background: #ffffff; border: 2px solid #e9ecef; border-radius: 8px; padding: 20px; margin-top: 40px; text-align: center;">
-                <h3 id="action-title" style="color: #0071e3; margin-bottom: 5px; font-size: 16px;">Siguiente Acción</h3>
-                <p id="action-desc" style="font-size: 13px; color: #6c757d; margin-bottom: 15px; font-weight: 600;"></p>
-
-                <select id="timeline-reason" class="table-select"
-                    style="margin-bottom: 20px; width: 80%; max-width: 450px; text-align: center; font-weight: 600;">
+            <div id="dynamic-action-panel" style="margin-top: 40px; text-align: center;">
+                <h3 id="action-title">Siguiente Acción</h3>
+                <p id="action-desc" style="margin-bottom: 15px;"></p>
+                
+                <select id="timeline-reason" class="table-select" style="margin-bottom: 20px; width: 80%; max-width: 450px; text-align: center; font-weight: 600;">
                     <option value="">-- Seleccionar Comentario del Contacto --</option>
-                    <option value="Sin respuesta (Se dejó mensaje/WhatsApp)">Sin respuesta (Se dejó mensaje/WhatsApp)
-                    </option>
+                    <option value="Sin respuesta (Se dejó mensaje/WhatsApp)">Sin respuesta (Se dejó mensaje/WhatsApp)</option>
                     <option value="Cliente se comunicará posteriormente">Cliente se comunicará posteriormente</option>
                     <option value="Fuera de la ciudad / Viaje">Fuera de la ciudad / Viaje</option>
                     <option value="Falta de presupuesto temporal">Falta de presupuesto temporal</option>
                     <option value="Pide reprogramar llamada">Pide reprogramar llamada</option>
                     <option value="Unidad en otro taller / Hojalatería">Unidad en otro taller / Hojalatería</option>
                 </select>
-
+                
                 <div id="pause-reason-container" class="hidden" style="margin-bottom: 15px;">
-                    <label
-                        style="font-size:12px; font-weight:bold; color:#ff3b30; display:block; margin-bottom:5px;">Motivo
-                        de Pausa/Baja:</label>
-                    <select id="pause-reason" class="table-select"
-                        style="max-width: 400px; margin: 0 auto; border: 2px solid #ff3b30;">
+                    <label style="font-size:12px; font-weight:bold; color:#722227; display:block; margin-bottom:5px;">Motivo de Pausa/Baja:</label>
+                    <select id="pause-reason" class="table-select" style="max-width: 400px; margin: 0 auto;">
                         <option value="">-- Seleccionar Motivo --</option>
                         <option value="Falta de Dinero / Quiere esperar">No tiene dinero / Desea postergar</option>
                         <option value="Número Equivocado / No Existe">Número Equivocado / Buzón Permanente</option>
@@ -357,51 +318,36 @@
                         <option value="Agendó en Otro Taller">Lo llevó a taller externo / Ya le hizo servicio</option>
                     </select>
                 </div>
-
+                
                 <div id="cita-date-container" class="hidden" style="margin-bottom: 15px;">
-                    <label
-                        style="font-size:12px; font-weight:bold; color:#34c759; display:block; margin-bottom:5px;">Fecha
-                        Programada de la Cita:</label>
-                    <input type="date" id="cita-date" class="table-input"
-                        style="max-width: 250px; margin: 0 auto; border: 2px solid #34c759;">
+                    <label style="font-size:12px; font-weight:bold; color:#547a53; display:block; margin-bottom:5px;">Fecha Programada de la Cita:</label>
+                    <input type="date" id="cita-date" class="table-input" style="max-width: 250px; margin: 0 auto;">
                 </div>
 
-                <div id="action-buttons" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
-                </div>
+                <div id="action-buttons" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;"></div>
             </div>
 
             <div style="margin-top: 20px;">
-                <strong style="font-size: 13px; color: #495057; text-transform: uppercase;">Historial de
-                    Trazabilidad:</strong>
-                <div id="modal-history"
-                    style="font-size: 12px; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 8px; max-height: 120px; overflow-y: auto; border: 1px solid #e9ecef;">
-                </div>
+                <strong style="font-size: 11px; color: #6e655c; letter-spacing: 0.6px; text-transform: uppercase;">Historial de Trazabilidad:</strong>
+                <div id="modal-history" style="font-size: 12px; margin-top: 8px; max-height: 120px; overflow-y: auto;"></div>
             </div>
         </div>
     </div>
-    <!-- #endregion -->
-
-    <!-- #region etapa 8    -->
+    
     <!-- ==========================================
          ETAPA 8: MODALES DE AUDITORÍA Y SEGURIDAD
          ========================================== -->
     <!-- Modal 1: Auditoría de Purga (KMs) -->
     <div id="report-modal" class="modal hidden">
         <div class="glass-modal-content" style="max-width: 850px; width: 100%;">
-            <h2 style="color: #ff3b30; border-bottom: 2px solid #eee; padding-bottom: 10px;">⚠️ Auditoría de Purga (KMs)
-            </h2>
-            <p style="font-size: 14px; margin: 10px 0;">El sistema detectó servicios de cortesía u otras áreas.
-                Selecciona los que <strong>SÍ deseas eliminar</strong> de la campaña.</p>
-            <div id="report-list"
-                style="max-height: 400px; overflow-y: auto; background: #f8f9fa; padding: 15px; border-radius: 8px; font-size: 13px; margin-bottom: 15px; border: 1px solid #ddd;">
-            </div>
-
+            <h2>Auditoría de Separación</h2>
+            <p style="font-size: 13px; margin: 10px 0; color: #6e655c;">El sistema detectó servicios de cortesía u otras áreas. Selecciona los que <strong>SÍ deseas eliminar</strong> de la campaña.</p>
+            <div id="report-list" style="max-height: 400px; overflow-y: auto; background: #fcfbf8; padding: 15px; border-radius: 12px; font-size: 13px; margin-bottom: 15px; border: 1px solid rgba(84,74,63,0.15);"></div>
+            
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span id="purge-counter" style="font-size: 13px; font-weight: bold; color: #ff3b30;">0
-                    seleccionados</span>
+                <span id="purge-counter" style="font-size: 13px; font-weight: bold; color: #722227;">0 seleccionados</span>
                 <div style="display: flex; gap: 10px;">
-                    <button id="btn-cancel-report" class="btn-corp-outline"
-                        style="color: #333; border-color: #ccc;">Cancelar Todo</button>
+                    <button id="btn-cancel-report" class="btn-corp-outline">Cancelar Todo</button>
                     <button id="btn-confirm-purge" class="btn-corp-danger">Confirmar Acción</button>
                 </div>
             </div>
@@ -410,17 +356,12 @@
 
     <!-- Modal 2: Auditoría de Carga Base -->
     <div id="base-report-modal" class="modal hidden">
-        <div class="glass-modal-content" style="max-width: 600px; width: 100%;">
-            <h2 style="color: #ff9f0a; border-bottom: 2px solid #eee; padding-bottom: 10px;">⚠️ Auditoría de Carga
-                (Ignorados)</h2>
-            <p style="font-size: 13px; margin: 10px 0;">El sistema bloqueó filas vacías o de "Totales". ¿Deseas
-                continuar subiendo la base?</p>
-            <div id="base-report-list"
-                style="max-height: 250px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 8px; font-size: 12px; margin-bottom: 15px;">
-            </div>
+        <div class="glass-modal-content" style="max-width: 850px; width: 100%;">
+            <h2>Previsualización de Carga</h2>
+            <p style="font-size: 13px; margin: 10px 0; color: #6e655c;">Revisa el resumen y la lista antes de confirmar la escritura en la nube.</p>
+            <div id="base-report-list" style="background: #fcfbf8; padding: 14px; border-radius: 12px; font-size: 12px; margin-bottom: 15px; border: 1px solid rgba(84,74,63,0.15);"></div>
             <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button id="btn-cancel-base" class="btn-corp-outline"
-                    style="color: #333; border-color: #ccc;">Abortar</button>
+                <button id="btn-cancel-base" class="btn-corp-outline">Abortar</button>
                 <button id="btn-confirm-base" class="btn-corp-primary">Confirmar Carga</button>
             </div>
         </div>
@@ -429,31 +370,19 @@
     <!-- Modal 3: Validación Proactivos -->
     <div id="proactivo-modal" class="modal hidden">
         <div class="glass-modal-content" style="max-width: 550px; text-align: center;">
-            <div style="font-size: 40px; margin-bottom: 10px;">🔍</div>
-            <h2 style="color: #5e5ce6; margin-bottom: 10px;">Validación de Proactivo (VIN Cross-Check)</h2>
-            <p style="font-size: 14px; margin-bottom: 15px; color: #555;">El sistema detectó que <strong
-                    id="proactivo-name" style="color: #0071e3;"></strong> con el VIN <strong
-                    id="proactivo-vin-text"></strong> acudió recientemente al taller.</p>
-            <p style="font-size: 14px; font-weight: bold; margin-bottom: 25px;">¿Confirmas que este cliente ya realizó
-                un servicio de mantenimiento?</p>
-
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-                <button id="btn-proactivo-yes" class="btn-corp-primary"
-                    style="background: #34c759; width: 100%; font-size: 14px; padding: 12px;">SÍ, confirmar servicio
-                    (Pasar a Completados)</button>
-                <button id="btn-proactivo-no" class="btn-corp-danger"
-                    style="width: 100%; font-size: 14px; padding: 12px;">NO, fue un servicio menor (Regresar a
-                    Gestión)</button>
-                <button id="btn-proactivo-cancel" class="btn-corp-outline"
-                    style="color: #333; border-color: #ccc; width: 100%; font-size: 14px; padding: 12px;">Cerrar
-                    ventana</button>
+            <h2>Validación de Proactivo</h2>
+            <p style="font-size: 14px; margin-bottom: 15px; color: #6e655c;">El sistema detectó que <strong id="proactivo-name" style="color: #231f1c;"></strong> con el VIN <strong id="proactivo-vin-text"></strong> acudió recientemente al taller.</p>
+            <p style="font-size: 14px; font-weight: 600; margin-bottom: 25px;">¿Confirmas que este cliente ya realizó un servicio de mantenimiento?</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button id="btn-proactivo-yes" class="btn-corp-primary" style="width: 100%; padding: 11px;">SÍ, confirmar servicio (Pasar a Completados)</button>
+                <button id="btn-proactivo-no" class="btn-corp-danger" style="width: 100%; padding: 11px;">NO, fue un servicio menor (Regresar a Gestión)</button>
+                <button id="btn-proactivo-cancel" class="btn-corp-outline" style="width: 100%; padding: 11px;">Cerrar ventana</button>
             </div>
         </div>
     </div>
-    <!-- #endregion -->
 
     <!-- MAIN SCRIPT (CEREBRO) - CACHE BUSTER -->
-    <script type="module" src="./js/app.js?v=2.6"></script>
+    <script type="module" src="./js/app.js?v=2.8"></script>
 </body>
-
 </html>
