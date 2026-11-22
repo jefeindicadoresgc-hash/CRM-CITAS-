@@ -1,6 +1,6 @@
 // =====================================================================
 // ARCHIVO: /js/ui/pipelineManager.js
-// OBJETIVO: Gestión Visual del Embudo (Timeline, Citas y Pausas) - Apple Pro
+// OBJETIVO: Gestión Visual del Embudo (Timeline, Citas y Pausas) - Cero Lecturas Extra
 // =====================================================================
 import { db, doc, updateDoc } from '../config/firebaseConfig.js';
 
@@ -21,9 +21,7 @@ let renderCallback = null;
 let viewingStep = 0;
 let proactivoIndex = null;
 
-// ---------------------------------------------------------
-// SECCIÓN 1: INICIALIZADOR PROTEGIDO
-// ---------------------------------------------------------
+//#region SECCIÓN 1: INICIALIZADOR PROTEGIDO
 export function initPipelineManager(dbRef, syncFn, renderFn) {
     activeDatabase = dbRef;
     syncCallback = syncFn;
@@ -41,9 +39,11 @@ export function initPipelineManager(dbRef, syncFn, renderFn) {
     if (btnProactivoYes) {
         btnProactivoYes.addEventListener('click', async () => {
             const client = activeDatabase[proactivoIndex];
-            await updateDoc(doc(db, "clientes", client.firebaseId), { contactado: 'PROACTIVO_CONFIRMADO', agendo: 'SI', paso_actual: 6 });
+            const updateObj = { contactado: 'PROACTIVO_CONFIRMADO', agendo: 'SI', paso_actual: 6 };
+            await updateDoc(doc(db, "clientes", client.firebaseId), updateObj);
+            Object.assign(client, updateObj);
             document.getElementById('proactivo-modal').classList.add('hidden');
-            await syncCallback();
+            renderCallback(); // Actualiza en RAM sin gastar lecturas de Firebase
         });
     }
 
@@ -51,9 +51,11 @@ export function initPipelineManager(dbRef, syncFn, renderFn) {
     if (btnProactivoNo) {
         btnProactivoNo.addEventListener('click', async () => {
             const client = activeDatabase[proactivoIndex];
-            await updateDoc(doc(db, "clientes", client.firebaseId), { contactado: '-', paso_actual: 0 });
+            const updateObj = { contactado: 'PENDIENTE', paso_actual: 0 };
+            await updateDoc(doc(db, "clientes", client.firebaseId), updateObj);
+            Object.assign(client, updateObj);
             document.getElementById('proactivo-modal').classList.add('hidden');
-            await syncCallback();
+            renderCallback(); // Actualiza en RAM sin gastar lecturas de Firebase
         });
     }
 
@@ -64,10 +66,9 @@ export function initPipelineManager(dbRef, syncFn, renderFn) {
         });
     }
 }
+//#endregion
 
-// ---------------------------------------------------------
-// SECCIÓN 2: LÓGICA DE INTERFAZ Y MÁQUINA DE ESTADOS
-// ---------------------------------------------------------
+//#region SECCIÓN 2: LÓGICA DE INTERFAZ Y MÁQUINA DE ESTADOS
 window.jumpToStep = function (stepIndex) {
     viewingStep = stepIndex;
     renderTimelineUI(activeDatabase[editingIndex]);
@@ -106,7 +107,6 @@ window.openModal = function (index) {
     document.getElementById('client-modal').classList.remove('hidden');
 };
 
-// PUENTE GLOBAL PARA CAMBIAR LAS VISTAS
 window.cambiarEstadoTimeline = function (nuevoEstado) {
     renderTimelineUI(activeDatabase[editingIndex], nuevoEstado);
 };
@@ -160,7 +160,7 @@ window.renderTimelineUI = function (client, stateOverride = 'DEFAULT') {
             document.getElementById('timeline-reason').classList.add('hidden');
             document.getElementById('cita-date-container').classList.remove('hidden');
             buttons.innerHTML = `
-                <button class="btn-corp-primary" style="background:#34c759;" onclick="procesarTimeline('EXITO_CITA')">Confirmar Cita</button>
+                <button class="btn-corp-primary" onclick="procesarTimeline('EXITO_CITA')">Confirmar Cita</button>
                 <button class="btn-corp-outline" onclick="cambiarEstadoTimeline('DEFAULT')">Cancelar</button>
             `;
         } else if (stateOverride === 'PAUSANDO') {
@@ -172,14 +172,12 @@ window.renderTimelineUI = function (client, stateOverride = 'DEFAULT') {
             `;
         }
     } else {
-        // CASO PASO 6 (Finales)
         title.textContent = "Estado Final";
         document.getElementById('timeline-reason').classList.add('hidden');
         document.getElementById('pause-reason-container').classList.add('hidden');
         document.getElementById('cita-date-container').classList.add('hidden');
 
         if (client.agendo === 'SI' && client.contactado !== 'CITA_EFECTIVA') {
-            // AQUÍ ESTÁ EL CAMBIO: Ya no se pueden autoevaluar.
             desc.textContent = "Cita programada. La asistencia se validará en automático al cargar el Excel del Taller.";
             buttons.innerHTML = `
                 <button class="btn-corp-danger" onclick="cambiarEstadoTimeline('PAUSANDO')">Cancelar Cita (Perdido)</button>
@@ -190,16 +188,13 @@ window.renderTimelineUI = function (client, stateOverride = 'DEFAULT') {
             buttons.innerHTML = `<button class="btn-corp-outline" onclick="document.getElementById('client-modal').classList.add('hidden')">Cerrar Ventana</button>`;
         }
     }
-}
+};
+//#endregion
 
-/* #region  SECCION 3 */
-// ---------------------------------------------------------
-// SECCIÓN 3: PROCESAMIENTO Y GUARDADO A FIREBASE
-// ---------------------------------------------------------
+//#region SECCIÓN 3: PROCESAMIENTO Y GUARDADO A FIREBASE (CERO RE-DESCARGAS)
 window.procesarTimeline = async function (tipoAccion) {
     const client = activeDatabase[editingIndex];
     const selectedReason = document.getElementById('timeline-reason').value;
-    const notaFinal = selectedReason ? ` [Reporte: ${selectedReason}]` : '';
 
     const now = new Date();
     const fechaLog = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -209,7 +204,7 @@ window.procesarTimeline = async function (tipoAccion) {
 
     if (tipoAccion === 'EXITO_CITA') {
         const citaStr = document.getElementById('cita-date').value;
-        if (!citaStr) return alert("Por favor selecciona la fecha y hora de la cita.");
+        if (!citaStr) return alert("Por favor selecciona la fecha de la cita.");
 
         updateObj.agendo = 'SI';
         updateObj.contactado = 'PENDIENTE';
@@ -245,25 +240,24 @@ window.procesarTimeline = async function (tipoAccion) {
     const nuevasLlamadas = [...(client.llamadas || []), logMsg];
     updateObj.llamadas = nuevasLlamadas;
 
-    document.getElementById('action-desc').textContent = "Sincronizando con la nube...";
+    document.getElementById('action-desc').textContent = "Guardando en la nube...";
     document.getElementById('action-buttons').innerHTML = "";
 
     await updateDoc(doc(db, "clientes", client.firebaseId), updateObj);
 
+    // Actualización directa en RAM: 0 lecturas a Firebase
     Object.assign(client, updateObj);
     viewingStep = client.paso_actual || 0;
     renderTimelineUI(client);
     renderModalHistory(client);
-
-    syncCallback();
+    renderCallback();
 };
-/* #endregion */
 
-// ---------------------------------------------------------
-// SECCIÓN 4: FUNCIONES GLOBALES DE MODALES EXTRAS
-// ---------------------------------------------------------
+//#region SECCIÓN 4: FUNCIONES GLOBALES DE MODALES EXTRAS
 function renderModalHistory(client) {
-    document.getElementById('modal-history').innerHTML = (client.llamadas || []).length === 0 ? "<em>Sin historial previo.</em>" : (client.llamadas || []).slice().reverse().map((f) => `<div style="margin-bottom:8px; border-bottom: 1px solid #eee; padding-bottom: 5px; color:#495057;">${f}</div>`).join('');
+    document.getElementById('modal-history').innerHTML = (client.llamadas || []).length === 0
+        ? "<em>Sin historial previo.</em>"
+        : (client.llamadas || []).slice().reverse().map((f) => `<div style="margin-bottom:8px; border-bottom: 1px solid rgba(84,74,63,0.12); padding-bottom: 5px; color:#6e655c;">${f}</div>`).join('');
 }
 
 window.abrirModalProactivo = function (index) {
@@ -272,3 +266,4 @@ window.abrirModalProactivo = function (index) {
     document.getElementById('proactivo-vin-text').textContent = activeDatabase[index].vin || 'N/D';
     document.getElementById('proactivo-modal').classList.remove('hidden');
 };
+//#endregion

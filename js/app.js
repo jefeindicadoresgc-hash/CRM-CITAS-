@@ -925,56 +925,49 @@ function renderTable() {
 }
 //#endregion
 
-//#region SECCIÓN 9: FUNCIONES GLOBALES Y RESCATE
-// ---------------------------------------------------------
-// SECCIÓN 9: FUNCIONES GLOBALES (Papelera y Retornos)
-// ---------------------------------------------------------
-
+//#region SECCIÓN 9: FUNCIONES GLOBALES Y RESCATE (CERO RE-DESCARGAS)
 window.deleteClient = async function(realIndex) { 
     if(confirm("¿Enviar a papelera?")) { 
-        await updateDoc(doc(db, "clientes", database[realIndex].firebaseId), { tab_type: 'papelera', old_tab: database[realIndex].tab_type }); 
-        await syncWithFirebase(); 
+        const client = database[realIndex];
+        const updateObj = { tab_type: 'papelera', old_tab: client.tab_type };
+        await updateDoc(doc(db, "clientes", client.firebaseId), updateObj); 
+        Object.assign(client, updateObj);
+        renderTable(); 
     } 
 };
 
 window.restoreClient = async function(realIndex) { 
-    await updateDoc(doc(db, "clientes", database[realIndex].firebaseId), { tab_type: database[realIndex].old_tab, old_tab: null }); 
-    await syncWithFirebase(); 
+    const client = database[realIndex];
+    const updateObj = { tab_type: client.old_tab, old_tab: null };
+    await updateDoc(doc(db, "clientes", client.firebaseId), updateObj); 
+    Object.assign(client, updateObj);
+    renderTable(); 
 };
 
 window.returnToReactivo = async function(realIndex) {
     if(confirm("¿Seguro que deseas retornar este cliente a PENDIENTES DE CITA? Se cancelará su cita agendada.")) {
         const client = database[realIndex];
-        await updateDoc(doc(db, "clientes", client.firebaseId), { 
-            agendo: 'NO', 
-            contactado: 'PENDIENTE',
-            fecha_cita: null
-        }); 
-        await syncWithFirebase(); 
+        const updateObj = { agendo: 'NO', contactado: 'PENDIENTE', fecha_cita: null };
+        await updateDoc(doc(db, "clientes", client.firebaseId), updateObj); 
+        Object.assign(client, updateObj);
+        renderTable(); 
         alert("Cliente retornado a Pendientes exitosamente.");
     }
 };
 
-// NUEVA FUNCIÓN: RESCATAR A REZAGADOS (Salta el tiempo hacia el mes actual)
 window.moveToDemorados = async function(realIndex) {
     const client = database[realIndex];
-    
     if(confirm(`¿Estás seguro de mover a ${client.cliente} a REZAGADOS?\n\nAl hacer esto, el cliente desaparecerá del mes donde lo estás viendo y será transferido automáticamente al mes actual en curso para que las operadoras le den seguimiento.`)) {
-        
-        // Obtener el mes y año real de hoy
         const today = new Date();
         const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-        
         uploadStatus.textContent = "Transfiriendo cliente a Rezagados... ⏳";
-        
         try {
-            await updateDoc(doc(db, "clientes", client.firebaseId), { 
-                contactado: 'DEMORADO',
-                mes_anio: currentMonthStr // La magia: Lo sacamos del mes viejo y lo inyectamos al nuevo
-            }); 
-            
-            await syncWithFirebase(); 
-            alert(`✅ Cliente rescatado exitosamente.\n\nAhora lo encontrarás en la pestaña "Rezagados" seleccionando el mes actual (${currentMonthStr}) en el filtro superior.`);
+            const updateObj = { contactado: 'DEMORADO', mes_anio: currentMonthStr };
+            await updateDoc(doc(db, "clientes", client.firebaseId), updateObj); 
+            Object.assign(client, updateObj);
+            renderTable();
+            uploadStatus.textContent = "";
+            alert(`✅ Cliente rescatado exitosamente.\n\nAhora lo encontrarás en la pestaña "Rezagados" del mes actual (${currentMonthStr}).`);
         } catch (error) {
             console.error(error);
             alert("Error al transferir al cliente.");
