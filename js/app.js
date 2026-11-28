@@ -1,10 +1,10 @@
 //#region SECCIÓN 1: IMPORTS DE MÓDULOS Y DEPENDENCIAS
 import { db, collection, getDocs, doc, writeBatch, updateDoc } from './config/firebaseConfig.js';
-import { processMainBaseActivos, crossReferenceServicesActivos, enrichClientDataActivos, markEffectiveAppointments } from './logic/activosLogic.js?v=2.8';
-import { processPrimerServicioBase } from './logic/primerServicioLogic.js?v=2.8';
-import { processMainBaseInactivos } from './logic/inactivosLogic.js?v=2.8';
-import { initAuth, adminMode } from './auth/accessController.js?v=2.8';
-import { initPipelineManager } from './ui/pipelineManager.js?v=2.8';
+import { processMainBaseActivos, crossReferenceServicesActivos, enrichClientDataActivos, markEffectiveAppointments, confirmPrepikingAppointments } from './logic/activosLogic.js?v=2.9';
+import { processPrimerServicioBase } from './logic/primerServicioLogic.js?v=2.9';
+import { processMainBaseInactivos } from './logic/inactivosLogic.js?v=2.9';
+import { initAuth, adminMode } from './auth/accessController.js?v=2.9';
+import { initPipelineManager } from './ui/pipelineManager.js?v=2.9';
 //#endregion
 
 //#region SECCIÓN 2: ESTADO GLOBAL Y MEMORIA EN TIEMPO REAL
@@ -93,7 +93,6 @@ function formatMesCorto(mesAnio) {
     document.addEventListener('click', () => popover.classList.add('hidden'));
     popover.addEventListener('click', (e) => e.stopPropagation());
 
-    // Sincronizar etiqueta al arrancar y cuando el código cambie #mes-filtro
     setTimeout(syncLabel, 50);
     inputMesFiltro.addEventListener('change', syncLabel);
 })();
@@ -151,9 +150,6 @@ if (modeAllToggle) {
 //#endregion
 
 //#region SECCIÓN 3: RUTINAS DE INICIALIZACIÓN (BOOT)
-// ---------------------------------------------------------
-// SECCIÓN 3: RUTINAS DE INICIALIZACIÓN (BOOT)
-// ---------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
     const today = new Date();
     const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -168,9 +164,6 @@ document.addEventListener('DOMContentLoaded', () => {
 //#endregion
 
 //#region SECCIÓN 4: CONEXIÓN A FIREBASE Y DESCARGA MASIVA
-// ---------------------------------------------------------
-// SECCIÓN 4: CONEXIÓN A FIREBASE Y DESCARGA MASIVA
-// ---------------------------------------------------------
 async function syncWithFirebase() {
     uploadStatus.textContent = "Sincronizando con la nube ☁️...";
     try {
@@ -295,7 +288,7 @@ document.getElementById('btn-process-excel').addEventListener('click', async () 
                 uploadStatus.textContent = "No se encontraron clientes en el rango de 1 a 3 años.";
                 alert("No hay clientes que cumplan con la ventana de 1 a 3 años en este archivo.");
             }
-            return; // 🛑 DETIENE EL CÓDIGO AQUÍ. JAMÁS SUBIRÁ A FIREBASE.
+            return;
         }
 
         // Flujo normal para Activos y Primer Servicio (Sí suben a Firebase)
@@ -312,9 +305,7 @@ document.getElementById('btn-process-excel').addEventListener('click', async () 
             return alert(`⚠️ No se encontraron clientes para cargar en ${activeTab.toUpperCase()} (${mesTrabajo}).\n\nVerifica que el Excel contenga el mes correcto (6 meses atrás).`);
         }
 
-        // =========================================================
         // CANDADO DE SEGURIDAD: PREVISUALIZACIÓN OBLIGATORIA
-        // =========================================================
         const totalSubir = tempNewRecords.length;
         const totalProactivos = tempNewRecords.filter(r => r.contactado === 'PROACTIVO').length;
         const totalPendientes = totalSubir - totalProactivos;
@@ -572,9 +563,9 @@ if (btnEfectivas) {
                 }));
                 await commitBatchInChunks(ops);
                 await syncWithFirebase();
-                alert(`✅ ¡ÉXITO! Se marcaron ${resultUpdates.length} servicios cruzados exitosamente.`);
+                alert(`✅ ¡ÉXITO! Se marcaron ${resultUpdates.length} servicios nuevos exitosamente.`);
             } else {
-                alert("⚠️ No se encontraron coincidencias para Citas.");
+                alert("⚠️ No se encontraron nuevas coincidencias para Citas.");
                 uploadStatus.textContent = "";
             }
         } catch (err) { console.error(err); uploadStatus.textContent = "Error al procesar el Cruce Taller."; }
@@ -624,6 +615,39 @@ if (btnClearSmart) {
         } catch (error) { console.error(error); uploadStatus.textContent = "Error al limpiar la nube."; }
     });
 }
+
+const btnPrepiking = document.getElementById('btn-process-prepiking');
+if (btnPrepiking) {
+    btnPrepiking.addEventListener('click', async () => {
+        const file = document.getElementById('excel-prepiking').files[0];
+        if (!file) return alert("Adjunta el reporte de citas (repcitasdet.xls).");
+
+        uploadStatus.textContent = "Cruzando VINs de Prepiking en Activos y Primer Servicio... ⏳";
+        try {
+            const { updates, totalVinsExcel } = await confirmPrepikingAppointments(file, database);
+
+            if (updates.length > 0) {
+                const ops = updates.map(u => ({ id: u.firebaseId, data: u.data }));
+                await commitBatchInChunks(ops);
+
+                // Actualización directa en RAM (0 lecturas a Firebase)
+                updates.forEach(u => Object.assign(u.client, u.data));
+                renderTable();
+
+                const enActivos = updates.filter(u => u.client.tab_type === 'activos').length;
+                const enPrimer = updates.filter(u => u.client.tab_type === 'primer').length;
+                uploadStatus.textContent = `✅ Prepiking confirmado: ${updates.length} citas pasadas a Citados Pendientes.`;
+                alert(`✅ ¡Prepiking Confirmado!\n\nVINs leídos del Excel: ${totalVinsExcel}\nCitas agregadas a Citados Pendientes: ${updates.length}\n• Base Activos: ${enActivos}\n• Primer Servicio: ${enPrimer}`);
+            } else {
+                uploadStatus.textContent = "No se encontraron nuevas citas pendientes por confirmar.";
+                alert(`Se leyeron ${totalVinsExcel} VINs del reporte, pero no hubo nuevas citas pendientes por agregar en Activos ni Primer Servicio.`);
+            }
+        } catch (err) {
+            console.error(err);
+            uploadStatus.textContent = "Error al procesar Confirma Prepiking.";
+        }
+    });
+}
 //#endregion
 
 //#region SECCIÓN 8: MOTOR DE MATEMÁTICA Y DIBUJO DE TABLA
@@ -670,7 +694,8 @@ function renderTable() {
     const panelDesc = document.getElementById('desc-upload-base');
     const panelOp2 = document.getElementById('panel-opcion-2');
     const panelOp3 = document.getElementById('panel-opcion-3');
-    const panelOp4 = document.getElementById('panel-opcion-4'); 
+    const panelOp4 = document.getElementById('panel-opcion-4');
+    const panelOp6 = document.getElementById('panel-opcion-6');
     const btnProcess = document.getElementById('btn-process-excel'); 
     
     if (activeTab === 'papelera' || activeTab === 'rezagados' || !effectiveAdmin) {
@@ -685,13 +710,15 @@ function renderTable() {
                 if(panelOp2) panelOp2.classList.add('hidden');
                 if(panelOp3) panelOp3.classList.add('hidden');
                 if(panelOp4) panelOp4.classList.remove('hidden');
+                if(panelOp6) panelOp6.classList.remove('hidden');
             } else if (activeTab === 'inactivos') {
                 panelTitle.textContent = "Filtro histórico";
                 panelDesc.textContent = "Descarga Excel (1 a 3 años, sin nube)";
                 if(btnProcess) btnProcess.textContent = "Descargar Excel"; 
                 if(panelOp2) panelOp2.classList.remove('hidden');
                 if(panelOp3) panelOp3.classList.remove('hidden');
-                if(panelOp4) panelOp4.classList.add('hidden'); 
+                if(panelOp4) panelOp4.classList.add('hidden');
+                if(panelOp6) panelOp6.classList.add('hidden');
             } else {
                 panelTitle.textContent = "Carga de base";
                 panelDesc.textContent = "Filtra a 6 meses y detecta proactivos";
@@ -699,6 +726,7 @@ function renderTable() {
                 if(panelOp2) panelOp2.classList.remove('hidden');
                 if(panelOp3) panelOp3.classList.remove('hidden');
                 if(panelOp4) panelOp4.classList.remove('hidden');
+                if(panelOp6) panelOp6.classList.remove('hidden');
             }
         }
     }
@@ -960,6 +988,16 @@ window.returnToReactivo = async function(realIndex) {
         Object.assign(client, updateObj);
         renderTable(); 
         alert("Cliente retornado a Pendientes exitosamente.");
+    }
+};
+
+window.returnProactivoToReactivo = async function(realIndex) {
+    if(confirm("¿Regresar este cliente Proactivo a PENDIENTES DE CITA?")) {
+        const client = database[realIndex];
+        const updateObj = { agendo: 'NO', contactado: 'PENDIENTE', paso_actual: 0 };
+        await updateDoc(doc(db, "clientes", client.firebaseId), updateObj);
+        Object.assign(client, updateObj);
+        renderTable();
     }
 };
 

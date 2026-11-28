@@ -310,7 +310,7 @@ export async function markEffectiveAppointments(fileFacturas, fileAsesores, curr
                     const fechaFactura = parseExcelDate(dataServicio.fecha_factura);
                     const fechaProxServicio = parseExcelDate(client.proximo_servicio);
 
-                    // Corte individual: 45 días antes de su propio proximo_servicio (aplica igual para Activos y Primer Servicio)
+                    // Corte individual: 45 días antes de su propio proximo_servicio (Activos y Primer Servicio)
                     let estatusFinal = 'CITA_EFECTIVA';
                     if (fechaFactura && fechaProxServicio) {
                         const fechaCorte45 = new Date(
@@ -336,6 +336,92 @@ export async function markEffectiveAppointments(fileFacturas, fileAsesores, curr
             
             resolve(verifiedRecords);
         } catch (error) { reject(error); }
+    });
+}
+//#endregion
+
+//#region SECCIÓN 5: CONFIRMA PREPIKING (Opción 6 - Cruce VIN en Activos y Primer Servicio)
+export async function confirmPrepikingAppointments(file, allDatabase) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const data = await readFileAsArrayBuffer(file);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            // Lectura por posición de columna (A=0, B=1 ... H=7 ... L=11)
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" });
+
+            const mapVinToCita = new Map();
+
+            rows.forEach((row) => {
+                if (!Array.isArray(row) || row.length < 8) return;
+
+                const vin = String(row[7] || '').trim().toUpperCase();      // Columna H
+                const fechaRaw = String(row[1] || '').trim();               // Columna B
+                const estatus = String(row[11] || '').trim().toUpperCase(); // Columna L
+
+                // Validar VIN (17 caracteres) y descartar citas canceladas
+                if (vin.length !== 17 || estatus.includes('CANCEL')) return;
+
+                const fechaObj = parseExcelDate(fechaRaw);
+                if (!fechaObj) return;
+
+                const yyyy = fechaObj.getFullYear();
+                const mm = String(fechaObj.getMonth() + 1).padStart(2, '0');
+                const dd = String(fechaObj.getDate()).padStart(2, '0');
+                const fechaISO = `${yyyy}-${mm}-${dd}`;
+                const fechaPrint = `${dd}/${mm}/${yyyy}`;
+
+                const prev = mapVinToCita.get(vin);
+                if (!prev || fechaObj >= prev.fechaObj) {
+                    mapVinToCita.set(vin, { fechaObj, fechaISO, fechaPrint });
+                }
+            });
+
+            const now = new Date();
+            const fechaLog = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+            const updates = [];
+
+            allDatabase.forEach((client) => {
+                // Solo busca en Base Activos y Primer Servicio
+                if (client.tab_type !== 'activos' && client.tab_type !== 'primer') return;
+
+                // Solo toma clientes que aún NO tienen cita ni están cerrados
+                if (
+                    client.agendo === 'SI' ||
+                    client.contactado === 'CITA_EFECTIVA' ||
+                    client.contactado === 'PROACTIVO' ||
+                    client.contactado === 'PROACTIVO_CONFIRMADO' ||
+                    client.contactado === 'PERDIDO'
+                ) {
+                    return;
+                }
+
+                const dbVin = String(client.vin || '').trim().toUpperCase();
+                const citaInfo = mapVinToCita.get(dbVin);
+
+                if (citaInfo && client.firebaseId) {
+                    const logMsg = `${fechaLog} | CITA CONFIRMADA POR PREPIKING (${citaInfo.fechaPrint}).`;
+                    const nuevasLlamadas = [...(client.llamadas || []), logMsg];
+
+                    updates.push({
+                        client,
+                        firebaseId: client.firebaseId,
+                        data: {
+                            agendo: 'SI',
+                            contactado: 'PENDIENTE',
+                            paso_actual: 6,
+                            fecha_cita: citaInfo.fechaISO,
+                            llamadas: nuevasLlamadas
+                        }
+                    });
+                }
+            });
+
+            resolve({ updates, totalVinsExcel: mapVinToCita.size });
+        } catch (error) {
+            reject(error);
+        }
     });
 }
 //#endregion
