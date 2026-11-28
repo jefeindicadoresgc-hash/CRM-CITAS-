@@ -721,6 +721,14 @@ function renderTable() {
     } else {
         baseData = database.filter(d => d.tab_type === activeTab && matchMes(d));
     }
+
+    // Regla única para Citados Pendientes (excluye Efectivas, Proactivos y Perdidos)
+    const isCitadoPendiente = (d) =>
+        d.agendo === 'SI' &&
+        d.contactado !== 'CITA_EFECTIVA' &&
+        d.contactado !== 'PROACTIVO' &&
+        d.contactado !== 'PROACTIVO_CONFIRMADO' &&
+        d.contactado !== 'PERDIDO';
     
     // KPIs: suman automáticamente los 3 meses en MODO ALL
     if (activeTab !== 'papelera' && activeTab !== 'rezagados') {
@@ -731,7 +739,7 @@ function renderTable() {
         if(statReact) statReact.textContent = baseData.filter(d => d.contactado !== 'CITA_EFECTIVA' && d.contactado !== 'PROACTIVO_CONFIRMADO' && d.contactado !== 'PERDIDO' && d.contactado !== 'PROACTIVO' && d.contactado !== 'DEMORADO' && d.agendo !== 'SI').length;
         
         const statAgen = document.getElementById('stat-agendados');
-        if(statAgen) statAgen.textContent = baseData.filter(d => d.agendo === 'SI' && d.contactado !== 'CITA_EFECTIVA').length;
+        if(statAgen) statAgen.textContent = baseData.filter(isCitadoPendiente).length;
         
         const statEfec = document.getElementById('stat-efectivas');
         if(statEfec) statEfec.textContent = baseData.filter(d => d.contactado === 'CITA_EFECTIVA').length;
@@ -762,7 +770,7 @@ function renderTable() {
             dataToShow.sort((a, b) => (calculateNextContact(a).dateObj || new Date(2100,0,1)) - (calculateNextContact(b).dateObj || new Date(2100,0,1)));
         }
         else if (currentFilter === 'agendados') {
-            dataToShow = dataToShow.filter(d => d.agendo === 'SI' && d.contactado !== 'CITA_EFECTIVA');
+            dataToShow = dataToShow.filter(isCitadoPendiente);
             dataToShow.sort((a, b) => (a.fecha_cita ? new Date(a.fecha_cita).getTime() : 0) - (b.fecha_cita ? new Date(b.fecha_cita).getTime() : 0));
         }
         else if (currentFilter === 'efectivas') { 

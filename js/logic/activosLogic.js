@@ -49,7 +49,6 @@ export async function processMainBaseActivos(file, targetTab, mesTrabajo) {
             let discardedRecords = [];
 
             // Calculamos el mes objetivo exacto (6 meses antes de mesTrabajo)
-            // Ej: mesTrabajo = "2026-12" -> Junio 2026
             const [yearStr, monthStr] = mesTrabajo.split('-');
             const targetDate = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10) - 1, 1);
             targetDate.setMonth(targetDate.getMonth() - 6);
@@ -79,16 +78,13 @@ export async function processMainBaseActivos(file, targetTab, mesTrabajo) {
                     return;
                 }
 
-                // A) Solo filas del mes objetivo (ej. Junio 2026)
                 if (dateObj.getFullYear() === targetYear && dateObj.getMonth() === targetMonth) {
                     const key = vin || `SIN_VIN_${orden}`;
                     const prev = baseObjetivoPorVin.get(key);
                     if (!prev || dateObj >= prev.dateObj) {
                         baseObjetivoPorVin.set(key, { row, orden, cliente, vin: vin || 'N/D', dateObj });
                     }
-                }
-                // B) Facturas posteriores (ej. Julio-Nov 2026) para detectar Proactivos
-                else if (dateObj > endOfTargetMonth && vin) {
+                } else if (dateObj > endOfTargetMonth && vin) {
                     const prevRet = retornosPosterioresPorVin.get(vin);
                     if (!prevRet || dateObj >= prevRet.dateObj) {
                         retornosPosterioresPorVin.set(vin, {
@@ -101,16 +97,19 @@ export async function processMainBaseActivos(file, targetTab, mesTrabajo) {
                 }
             });
 
-            // PASADA 2: Armar registros finales con fecha +6 meses (segura en fin de mes) y cruce Proactivo
+            // PASADA 2: Armar registros finales con fecha +6 meses y corte individual de -45 días
             let newRecords = [];
             baseObjetivoPorVin.forEach(({ row, orden, cliente, vin, dateObj }) => {
-                const retorno = vin !== 'N/D' ? retornosPosterioresPorVin.get(vin) : null;
-                const esProactivo = Boolean(retorno);
-
                 const targetMonthLastDay = new Date(dateObj.getFullYear(), dateObj.getMonth() + 7, 0).getDate();
                 const safeDay = Math.min(dateObj.getDate(), targetMonthLastDay);
                 const proxDate = new Date(dateObj.getFullYear(), dateObj.getMonth() + 6, safeDay);
                 const proxServicioStr = formatDateDDMMYYYY(proxDate);
+
+                // Corte individual: 45 días antes de su próximo servicio
+                const fechaCorte45 = new Date(proxDate.getFullYear(), proxDate.getMonth(), proxDate.getDate() - 45);
+
+                const retorno = vin !== 'N/D' ? retornosPosterioresPorVin.get(vin) : null;
+                const esProactivo = Boolean(retorno && retorno.dateObj < fechaCorte45);
 
                 const newClient = {
                     orden: orden,
@@ -248,13 +247,10 @@ export async function crossReferenceServicesActivos(files, currentDatabase) {
 }
 //#endregion
 
-//#region SECCIÓN 4: CITAS EFECTIVAS POR VIN (15 DÍAS DE CORTE)
+//#region SECCIÓN 4: CITAS EFECTIVAS POR VIN (CORTE INDIVIDUAL -45 DÍAS Y SOLO NUEVOS)
 export async function markEffectiveAppointments(fileFacturas, fileAsesores, currentDatabase, mesTrabajo) {
     return new Promise(async (resolve, reject) => {
         try {
-            const [yearStr, monthStr] = mesTrabajo.split('-');
-            const fechaCorteProactivo = new Date(parseInt(yearStr), parseInt(monthStr) - 2, 15);
-
             const dataFacturas = await readFileAsArrayBuffer(fileFacturas);
             const wbFacturas = XLSX.read(dataFacturas, { type: 'array' });
             const rawFacturas = XLSX.utils.sheet_to_json(wbFacturas.Sheets[wbFacturas.SheetNames[0]], { defval: "" });
@@ -288,6 +284,15 @@ export async function markEffectiveAppointments(fileFacturas, fileAsesores, curr
 
             let verifiedRecords = [];
             currentDatabase.forEach(client => {
+                // Evita volver a contar y sobrescribir clientes que ya fueron marcados antes
+                if (
+                    client.contactado === 'CITA_EFECTIVA' ||
+                    client.contactado === 'PROACTIVO' ||
+                    client.contactado === 'PROACTIVO_CONFIRMADO'
+                ) {
+                    return;
+                }
+
                 const dbVin = String(client.vin || '').trim().toUpperCase();
                 const dataServicio = mapVinToServicio[dbVin];
                 
@@ -302,14 +307,23 @@ export async function markEffectiveAppointments(fileFacturas, fileAsesores, curr
                         } else { if(maxKms === -1) mejorServicio = desc; }
                     });
                     
-                    const fechaComparacion = parseExcelDate(dataServicio.fecha_factura);
+                    const fechaFactura = parseExcelDate(dataServicio.fecha_factura);
+                    const fechaProxServicio = parseExcelDate(client.proximo_servicio);
 
+                    // Corte individual: 45 días antes de su propio proximo_servicio (aplica igual para Activos y Primer Servicio)
                     let estatusFinal = 'CITA_EFECTIVA';
-                    if (fechaComparacion && fechaComparacion <= fechaCorteProactivo) {
-                        estatusFinal = 'PROACTIVO';
+                    if (fechaFactura && fechaProxServicio) {
+                        const fechaCorte45 = new Date(
+                            fechaProxServicio.getFullYear(),
+                            fechaProxServicio.getMonth(),
+                            fechaProxServicio.getDate() - 45
+                        );
+                        if (fechaFactura < fechaCorte45) {
+                            estatusFinal = 'PROACTIVO';
+                        }
                     }
 
-                    let fechaPrint = fechaComparacion ? formatDateDDMMYYYY(fechaComparacion) : dataServicio.fecha_factura;
+                    let fechaPrint = fechaFactura ? formatDateDDMMYYYY(fechaFactura) : dataServicio.fecha_factura;
 
                     verifiedRecords.push({
                         firebaseId: client.firebaseId,
@@ -324,4 +338,4 @@ export async function markEffectiveAppointments(fileFacturas, fileAsesores, curr
         } catch (error) { reject(error); }
     });
 }
-//#endregion 
+//#endregion
